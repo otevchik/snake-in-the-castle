@@ -8,7 +8,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const SupabaseTelegram = {
   url: SUPABASE_URL,
   key: SUPABASE_ANON_KEY,
-  debug: true, // Включить логирование
+  debug: true,
   
   log(...args) {
     if (this.debug) {
@@ -20,7 +20,6 @@ const SupabaseTelegram = {
     console.error('[Supabase Error]', ...args);
   },
   
-  // Make API request to Supabase
   async request(endpoint, options = {}) {
     const url = `${this.url}/rest/v1/${endpoint}`;
     
@@ -75,11 +74,9 @@ const SupabaseTelegram = {
       const player = data[0];
       this.log('Player found:', player);
       
-      // Get owned skins
       const skins = await this.request(`telegram_player_skins?telegram_id=eq.${telegramId}&select=skin_id`);
       player.ownedSkins = skins ? skins.map(s => s.skin_id) : ['knight', 'dragon'];
       
-      // Get inventory
       const inventory = await this.request(`telegram_player_inventory?telegram_id=eq.${telegramId}&select=item_id,quantity`);
       player.inventory = inventory ? inventory.map(i => ({ id: i.item_id, quantity: i.quantity })) : [];
       
@@ -94,7 +91,6 @@ const SupabaseTelegram = {
     this.log('Creating player:', telegramId, userData);
     
     try {
-      // Create player
       const result = await this.request('telegram_players', {
         method: 'POST',
         body: {
@@ -102,7 +98,7 @@ const SupabaseTelegram = {
           username: userData?.username || null,
           first_name: userData?.first_name || 'Player',
           last_name: userData?.last_name || null,
-          coins: 500,
+          coins: 250,
           high_score: 0,
           games_played: 0,
           equipped_skin: 'knight'
@@ -112,7 +108,6 @@ const SupabaseTelegram = {
       
       this.log('Player created:', result);
       
-      // Add starter skins
       await this.request('telegram_player_skins', {
         method: 'POST',
         body: [
@@ -125,7 +120,6 @@ const SupabaseTelegram = {
       return await this.getPlayer(telegramId);
     } catch (error) {
       this.error('Error creating player:', error);
-      // Попробуем получить существующего игрока
       return await this.getPlayer(telegramId);
     }
   },
@@ -181,7 +175,6 @@ const SupabaseTelegram = {
     this.log('Ending game session:', sessionToken, 'Score:', finalScore);
     
     try {
-      // Update session
       if (sessionToken) {
         await this.request(`telegram_game_sessions?session_token=eq.${sessionToken}`, {
           method: 'PATCH',
@@ -192,7 +185,6 @@ const SupabaseTelegram = {
         });
       }
       
-      // Get and update player
       const player = await this.getPlayer(telegramId);
       const coinsEarned = finalScore * 5;
       const isNewRecord = finalScore > (player?.high_score || 0);
@@ -209,7 +201,6 @@ const SupabaseTelegram = {
       
       this.log('Update result:', updateResult);
       
-      // Update leaderboard if new record
       if (isNewRecord && finalScore > 0) {
         await this.updateLeaderboard(telegramId, finalScore, userData);
       }
@@ -231,73 +222,43 @@ const SupabaseTelegram = {
   // =====================
   
   async getLeaderboard(page = 1, perPage = 10) {
-  try {
-    // Get total count
-    const countData = await this.request('telegram_leaderboard?select=telegram_id');
-    const totalPlayers = Array.isArray(countData) ? countData.length : 0;
-    const totalPages = Math.ceil(totalPlayers / perPage) || 1;
-    
-    // Get paginated data
-    const offset = (page - 1) * perPage;
-    const players = await this.request(
-      `telegram_leaderboard?select=telegram_id,username,first_name,high_score,created_at,updated_at&order=high_score.desc&limit=${perPage}&offset=${offset}`
-    );
-    
-    return {
-      players: players ? players.map(p => ({
-        telegramId: p.telegram_id,
-        username: p.username,
-        firstName: p.first_name,
-        displayName: this.maskName(p.username, p.first_name),
-        highScore: p.high_score,
-        createdAt: p.created_at,
-        updatedAt: p.updated_at
-      })) : [],
-      currentPage: page,
-      totalPages,
-      totalPlayers
-    };
-  } catch (error) {
-    this.error('Error getting leaderboard:', error);
-    return { players: [], currentPage: 1, totalPages: 1, totalPlayers: 0 };
-  }
-},
-
-// Функция маскировки имени
-maskName(username, firstName) {
-  let name = '';
-  
-  if (username) {
-    name = '@' + username;
-  } else if (firstName) {
-    name = firstName;
-  } else {
-    return 'Player';
-  }
-  
-  // Если имя слишком короткое, показываем как есть
-  if (name.length <= 3) {
-    return name;
-  }
-  
-  // Показываем первые 2 символа и последний, остальное скрываем
-  const visibleStart = 2;
-  const visibleEnd = 1;
-  const hiddenLength = name.length - visibleStart - visibleEnd;
-  const masked = name.slice(0, visibleStart) + '•'.repeat(hiddenLength) + name.slice(-visibleEnd);
-  
-  return masked;
+    try {
+      const countData = await this.request('telegram_leaderboard?select=telegram_id');
+      const totalPlayers = Array.isArray(countData) ? countData.length : 0;
+      const totalPages = Math.ceil(totalPlayers / perPage) || 1;
+      
+      const offset = (page - 1) * perPage;
+      const players = await this.request(
+        `telegram_leaderboard?select=telegram_id,username,first_name,high_score,created_at,updated_at&order=high_score.desc&limit=${perPage}&offset=${offset}`
+      );
+      
+      return {
+        players: players ? players.map(p => ({
+          telegramId: p.telegram_id,
+          username: p.username,
+          firstName: p.first_name,
+          displayName: p.username ? '@' + p.username : p.first_name || 'Player',
+          highScore: p.high_score,
+          createdAt: p.created_at,
+          updatedAt: p.updated_at
+        })) : [],
+        currentPage: page,
+        totalPages,
+        totalPlayers
+      };
+    } catch (error) {
+      this.error('Error getting leaderboard:', error);
+      return { players: [], currentPage: 1, totalPages: 1, totalPlayers: 0 };
+    }
   },
   
   async updateLeaderboard(telegramId, score, userData) {
     this.log('Updating leaderboard:', telegramId, score);
     
     try {
-      // Check if entry exists
       const existing = await this.request(`telegram_leaderboard?telegram_id=eq.${telegramId}&select=*`);
       
       if (existing && existing.length > 0) {
-        // Update only if higher score
         if (score > existing[0].high_score) {
           await this.request(`telegram_leaderboard?telegram_id=eq.${telegramId}`, {
             method: 'PATCH',
@@ -310,7 +271,6 @@ maskName(username, firstName) {
           });
         }
       } else {
-        // Insert new entry
         await this.request('telegram_leaderboard', {
           method: 'POST',
           body: {
@@ -360,7 +320,6 @@ maskName(username, firstName) {
         return { success: false, error: 'Not enough coins' };
       }
       
-      // Update coins
       await this.updatePlayer(telegramId, {
         coins: player.coins - price,
         high_score: player.high_score,
@@ -368,7 +327,6 @@ maskName(username, firstName) {
         equipped_skin: player.equipped_skin
       });
       
-      // Check if item exists in inventory
       const existing = await this.request(
         `telegram_player_inventory?telegram_id=eq.${telegramId}&item_id=eq.${itemId}&select=*`
       );
@@ -443,11 +401,9 @@ maskName(username, firstName) {
         return { success: false, error: 'Not enough coins!' };
       }
       
-      // Get droppable skins
       const droppableSkins = skins.filter(s => !s.starter && s.weight > 0);
       const totalWeight = droppableSkins.reduce((sum, s) => sum + s.weight, 0);
       
-      // Random selection
       let random = Math.random() * totalWeight;
       let selectedSkin = null;
       
@@ -467,13 +423,11 @@ maskName(username, firstName) {
       let refundAmount = 0;
       let newCoins = player.coins - casePrice;
       
-      // Check if already owned
       if (player.ownedSkins && player.ownedSkins.includes(selectedSkin.id)) {
         isDuplicate = true;
         refundAmount = Math.floor(casePrice * 0.25);
         newCoins += refundAmount;
       } else {
-        // Add skin
         await this.request('telegram_player_skins', {
           method: 'POST',
           body: {
@@ -483,7 +437,6 @@ maskName(username, firstName) {
         });
       }
       
-      // Update coins
       await this.updatePlayer(telegramId, {
         coins: newCoins,
         high_score: player.high_score,
@@ -561,8 +514,6 @@ maskName(username, firstName) {
   }
 };
 
-// Export
 window.SupabaseTelegram = SupabaseTelegram;
 
-// Test connection on load
 SupabaseTelegram.testConnection();
