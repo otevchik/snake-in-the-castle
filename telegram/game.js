@@ -404,11 +404,12 @@ async function renderLeaderboard() {
   const container = document.getElementById('leaderboardList');
   const data = await SupabaseTelegram.getLeaderboard(currentLeaderboardPage, 10);
   
-  // Получаем ID текущего пользователя
-  const currentUserId = TelegramApp.getUserId();
+  // Берём ID из playerData, так как он точно совпадает с базой
+  const myTelegramId = playerData?.telegram_id;
   
   console.log('=== LEADERBOARD DEBUG ===');
-  console.log('Current user ID:', currentUserId, 'Type:', typeof currentUserId);
+  console.log('My telegram_id from playerData:', myTelegramId);
+  console.log('TelegramApp.getUserId():', TelegramApp.getUserId());
   
   container.innerHTML = '';
   
@@ -420,14 +421,19 @@ async function renderLeaderboard() {
   data.players.forEach((player, index) => {
     const globalRank = (currentLeaderboardPage - 1) * 10 + index + 1;
     
-    console.log(`Player ${index}: telegramId=${player.telegramId}, Type=${typeof player.telegramId}`);
+    // Сравниваем с ID из playerData
+    let isCurrentPlayer = false;
     
-    // Сравниваем оба значения как строки - самый надёжный способ
-    const isCurrentPlayer = currentUserId != null && 
-                           player.telegramId != null && 
-                           String(currentUserId) === String(player.telegramId);
+    if (myTelegramId != null && player.telegramId != null) {
+      // Пробуем разные варианты сравнения
+      isCurrentPlayer = (
+        myTelegramId === player.telegramId ||
+        String(myTelegramId) === String(player.telegramId) ||
+        Number(myTelegramId) === Number(player.telegramId)
+      );
+    }
     
-    console.log(`Match: ${String(currentUserId)} === ${String(player.telegramId)} = ${isCurrentPlayer}`);
+    console.log(`Player: ${player.displayName}, ID: ${player.telegramId}, MyID: ${myTelegramId}, Match: ${isCurrentPlayer}`);
     
     let rankClass = '';
     let rankIcon = '';
