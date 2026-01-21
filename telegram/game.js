@@ -820,7 +820,7 @@ function initGame() {
   magnetRadius = 0;
   hasShield = false;
   hasGhost = false;
-  baseSpeed = 8;
+  baseSpeed = 6;
   
   // Apply perks
   if (hasPerk('double_coins')) {
@@ -834,7 +834,7 @@ function initGame() {
   }
   
   if (hasPerk('slow_start')) {
-    baseSpeed = 5;
+    baseSpeed = 4;
     showToast('Slow Start activated! 🐢', 'success');
   }
   
@@ -1299,7 +1299,7 @@ function updateSnake() {
     food = spawnFood();
     score++;
     
-    const coinsGained = 10 * coinMultiplier;
+    const coinsGained = 5 * coinMultiplier;
     coinsEarnedThisGame += coinsGained;
     document.getElementById('score').textContent = score;
     
@@ -1308,8 +1308,8 @@ function updateSnake() {
       document.getElementById('highScore').textContent = highScore;
     }
     
-    if (score % 5 === 0 && speed < 15) {
-      speed += 0.5;
+    if (score % 10 === 0 && speed < 10) {
+      speed += 0.3;
     }
   } else {
     snake.pop();

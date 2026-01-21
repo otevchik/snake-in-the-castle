@@ -194,7 +194,7 @@ const SupabaseTelegram = {
       
       // Get and update player
       const player = await this.getPlayer(telegramId);
-      const coinsEarned = finalScore * 10;
+      const coinsEarned = finalScore * 5;
       const isNewRecord = finalScore > (player?.high_score || 0);
       
       this.log('Player before update:', player);
