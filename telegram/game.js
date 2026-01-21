@@ -373,6 +373,30 @@ function getRarityColor(rarity) {
 }
 
 // =====================
+// MASK PLAYER NAME
+// =====================
+
+function maskPlayerName(name) {
+  if (!name) {
+    return 'P***r';
+  }
+  
+  const str = String(name);
+  
+  if (str.length <= 2) {
+    return str.charAt(0) + '*';
+  }
+  
+  if (str.length <= 4) {
+    return str.charAt(0) + '*'.repeat(str.length - 2) + str.charAt(str.length - 1);
+  }
+  
+  // Показываем первые 2 и последний символ
+  const hidden = '*'.repeat(str.length - 3);
+  return str.slice(0, 2) + hidden + str.slice(-1);
+}
+
+// =====================
 // LEADERBOARD
 // =====================
 
@@ -380,78 +404,41 @@ async function renderLeaderboard() {
   const container = document.getElementById('leaderboardList');
   const data = await SupabaseTelegram.getLeaderboard(currentLeaderboardPage, 10);
   
-  // Получаем текущий ID пользователя
-  const currentUserId = TelegramApp.getUserId();
-  console.log('Current user ID for leaderboard:', currentUserId);
-  
   container.innerHTML = '';
   
   if (data.players.length === 0) {
     container.innerHTML = '<p style="text-align: center; color: #a0a0a0; padding: 30px;">No players yet. Be the first!</p>';
-  } else {
-    data.players.forEach((player, index) => {
-      const globalRank = (currentLeaderboardPage - 1) * 10 + index + 1;
-      
-      // Сравниваем как числа, приводя оба значения к строке для надёжности
-      const isCurrentPlayer = currentUserId && 
-        String(player.telegramId) === String(currentUserId);
-      
-      console.log('Comparing:', player.telegramId, 'vs', currentUserId, '=', isCurrentPlayer);
-      
-      let rankClass = '';
-      let rankIcon = '';
-      
-      if (globalRank === 1) { rankClass = 'gold'; rankIcon = '🥇'; }
-      else if (globalRank === 2) { rankClass = 'silver'; rankIcon = '🥈'; }
-      else if (globalRank === 3) { rankClass = 'bronze'; rankIcon = '🥉'; }
-      
-      // Всегда маскируем имена других игроков
-      const displayName = isCurrentPlayer 
-        ? (player.displayName + ' (You)') 
-        : maskPlayerName(player.displayName);
-      
-      const item = document.createElement('div');
-      item.className = `leaderboard-item ${rankClass} ${isCurrentPlayer ? 'current-player' : ''}`;
-      item.innerHTML = `
-        <span class="rank">${globalRank}</span>
-        <span class="rank-icon">${rankIcon}</span>
-        <span class="player">${displayName}</span>
-        <span class="lb-score">${player.highScore}</span>
-      `;
-      container.appendChild(item);
-    });
+    return;
   }
+  
+  data.players.forEach((player, index) => {
+    const globalRank = (currentLeaderboardPage - 1) * 10 + index + 1;
+    
+    let rankClass = '';
+    let rankIcon = '';
+    
+    if (globalRank === 1) { rankClass = 'gold'; rankIcon = '🥇'; }
+    else if (globalRank === 2) { rankClass = 'silver'; rankIcon = '🥈'; }
+    else if (globalRank === 3) { rankClass = 'bronze'; rankIcon = '🥉'; }
+    
+    // Всегда маскируем все имена для приватности
+    const maskedName = maskPlayerName(player.displayName);
+    
+    const item = document.createElement('div');
+    item.className = `leaderboard-item ${rankClass}`;
+    item.innerHTML = `
+      <span class="rank">${globalRank}</span>
+      <span class="rank-icon">${rankIcon}</span>
+      <span class="player">${maskedName}</span>
+      <span class="lb-score">${player.highScore}</span>
+    `;
+    container.appendChild(item);
+  });
   
   document.getElementById('pageInfo').textContent = 
     `Page ${data.currentPage} of ${data.totalPages}`;
   document.getElementById('prevPageBtn').disabled = data.currentPage <= 1;
   document.getElementById('nextPageBtn').disabled = data.currentPage >= data.totalPages;
-}
-
-// =====================
-// MASK PLAYER NAME
-// =====================
-
-function maskPlayerName(name) {
-  if (!name) {
-    return 'Player';
-  }
-  
-  // Если имя слишком короткое - маскируем полностью
-  if (name.length <= 3) {
-    return name.charAt(0) + '**';
-  }
-  
-  // Показываем первые 2 символа и последний, остальное скрываем
-  const visibleStart = 2;
-  const visibleEnd = 1;
-  const hiddenLength = name.length - visibleStart - visibleEnd;
-  
-  if (hiddenLength <= 0) {
-    return name.charAt(0) + '*'.repeat(name.length - 1);
-  }
-  
-  return name.slice(0, visibleStart) + '*'.repeat(hiddenLength) + name.slice(-visibleEnd);
 }
 
 document.getElementById('prevPageBtn').addEventListener('click', async () => {
