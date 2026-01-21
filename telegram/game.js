@@ -404,11 +404,11 @@ async function renderLeaderboard() {
   const container = document.getElementById('leaderboardList');
   const data = await SupabaseTelegram.getLeaderboard(currentLeaderboardPage, 10);
   
-  // Получаем ID текущего пользователя и приводим к числу
+  // Получаем ID текущего пользователя
   const currentUserId = TelegramApp.getUserId();
-  const currentUserIdNum = currentUserId ? Number(currentUserId) : null;
   
-  console.log('Leaderboard - Current user ID:', currentUserIdNum);
+  console.log('=== LEADERBOARD DEBUG ===');
+  console.log('Current user ID:', currentUserId, 'Type:', typeof currentUserId);
   
   container.innerHTML = '';
   
@@ -420,15 +420,14 @@ async function renderLeaderboard() {
   data.players.forEach((player, index) => {
     const globalRank = (currentLeaderboardPage - 1) * 10 + index + 1;
     
-    // Приводим ID игрока к числу для сравнения
-    const playerIdNum = player.telegramId ? Number(player.telegramId) : null;
+    console.log(`Player ${index}: telegramId=${player.telegramId}, Type=${typeof player.telegramId}`);
     
-    // Проверяем, это текущий пользователь или нет
-    const isCurrentPlayer = currentUserIdNum !== null && 
-                           playerIdNum !== null && 
-                           currentUserIdNum === playerIdNum;
+    // Сравниваем оба значения как строки - самый надёжный способ
+    const isCurrentPlayer = currentUserId != null && 
+                           player.telegramId != null && 
+                           String(currentUserId) === String(player.telegramId);
     
-    console.log(`Player ${index}: ID=${playerIdNum}, Current=${currentUserIdNum}, Match=${isCurrentPlayer}`);
+    console.log(`Match: ${String(currentUserId)} === ${String(player.telegramId)} = ${isCurrentPlayer}`);
     
     let rankClass = '';
     let rankIcon = '';
@@ -440,7 +439,7 @@ async function renderLeaderboard() {
     // Маскируем имя для приватности
     const maskedName = maskPlayerName(player.displayName);
     
-    // Добавляем "(You)" если это текущий пользователь
+    // Добавляем метку если это текущий пользователь
     const displayName = isCurrentPlayer ? maskedName + ' 👈' : maskedName;
     
     const item = document.createElement('div');
@@ -453,6 +452,8 @@ async function renderLeaderboard() {
     `;
     container.appendChild(item);
   });
+  
+  console.log('=== END LEADERBOARD DEBUG ===');
   
   document.getElementById('pageInfo').textContent = 
     `Page ${data.currentPage} of ${data.totalPages}`;

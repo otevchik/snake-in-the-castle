@@ -222,34 +222,39 @@ const SupabaseTelegram = {
   // =====================
   
   async getLeaderboard(page = 1, perPage = 10) {
-    try {
-      const countData = await this.request('telegram_leaderboard?select=telegram_id');
-      const totalPlayers = Array.isArray(countData) ? countData.length : 0;
-      const totalPages = Math.ceil(totalPlayers / perPage) || 1;
-      
-      const offset = (page - 1) * perPage;
-      const players = await this.request(
-        `telegram_leaderboard?select=telegram_id,username,first_name,high_score,created_at,updated_at&order=high_score.desc&limit=${perPage}&offset=${offset}`
-      );
-      
-      return {
-        players: players ? players.map(p => ({
-          telegramId: p.telegram_id,
+  try {
+    const countData = await this.request('telegram_leaderboard?select=telegram_id');
+    const totalPlayers = Array.isArray(countData) ? countData.length : 0;
+    const totalPages = Math.ceil(totalPlayers / perPage) || 1;
+    
+    const offset = (page - 1) * perPage;
+    const players = await this.request(
+      `telegram_leaderboard?select=telegram_id,username,first_name,high_score,created_at,updated_at&order=high_score.desc&limit=${perPage}&offset=${offset}`
+    );
+    
+    console.log('Raw leaderboard data:', players);
+    
+    return {
+      players: players ? players.map(p => {
+        console.log('Mapping player:', p.telegram_id, typeof p.telegram_id);
+        return {
+          telegramId: p.telegram_id,  // Оставляем как есть, не преобразуем
           username: p.username,
           firstName: p.first_name,
           displayName: p.username ? '@' + p.username : p.first_name || 'Player',
           highScore: p.high_score,
           createdAt: p.created_at,
           updatedAt: p.updated_at
-        })) : [],
-        currentPage: page,
-        totalPages,
-        totalPlayers
-      };
-    } catch (error) {
-      this.error('Error getting leaderboard:', error);
-      return { players: [], currentPage: 1, totalPages: 1, totalPlayers: 0 };
-    }
+        };
+      }) : [],
+      currentPage: page,
+      totalPages,
+      totalPlayers
+    };
+  } catch (error) {
+    this.error('Error getting leaderboard:', error);
+    return { players: [], currentPage: 1, totalPages: 1, totalPlayers: 0 };
+  }
   },
   
   async updateLeaderboard(telegramId, score, userData) {
