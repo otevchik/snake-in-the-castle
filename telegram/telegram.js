@@ -10,9 +10,18 @@ const TelegramApp = {
   // Initialize Telegram Web App
   init() {
     return new Promise((resolve, reject) => {
+      console.log('=== TELEGRAM INIT START ===');
+      console.log('window.Telegram:', window.Telegram);
+      console.log('window.Telegram.WebApp:', window.Telegram?.WebApp);
+      
       // Check if running inside Telegram
       if (window.Telegram && window.Telegram.WebApp) {
         this.webApp = window.Telegram.WebApp;
+        
+        console.log('WebApp version:', this.webApp.version);
+        console.log('WebApp platform:', this.webApp.platform);
+        console.log('initData:', this.webApp.initData);
+        console.log('initDataUnsafe:', JSON.stringify(this.webApp.initDataUnsafe, null, 2));
         
         // Expand to full height
         this.webApp.expand();
@@ -25,33 +34,46 @@ const TelegramApp = {
           this.user = this.webApp.initDataUnsafe.user;
           this.isReady = true;
           
-          console.log('Telegram user:', this.user);
+          console.log('✅ TELEGRAM USER FOUND:');
+          console.log('  ID:', this.user.id);
+          console.log('  Username:', this.user.username);
+          console.log('  First Name:', this.user.first_name);
+          console.log('  Last Name:', this.user.last_name);
+          
           resolve(this.user);
         } else {
           // For testing outside Telegram
-          console.warn('No Telegram user data, using test mode');
-          this.user = {
-            id: 123456789,
-            first_name: 'Test',
-            last_name: 'User',
-            username: 'testuser'
-          };
+          console.warn('⚠️ No Telegram user data - using TEST MODE');
+          console.warn('initDataUnsafe:', this.webApp.initDataUnsafe);
+          
+          this.user = this.createTestUser();
           this.isReady = true;
           resolve(this.user);
         }
       } else {
         // Not in Telegram, use test mode
-        console.warn('Not running in Telegram, using test mode');
-        this.user = {
-          id: 123456789,
-          first_name: 'Test',
-          last_name: 'User',
-          username: 'testuser'
-        };
+        console.warn('⚠️ Not running in Telegram - using TEST MODE');
+        
+        this.user = this.createTestUser();
         this.isReady = true;
         resolve(this.user);
       }
+      
+      console.log('=== TELEGRAM INIT END ===');
     });
+  },
+  
+  // Create test user for development
+  createTestUser() {
+    // Генерируем уникальный ID на основе времени для тестов
+    const testId = Math.floor(Date.now() / 1000);
+    
+    return {
+      id: testId,
+      first_name: 'Test',
+      last_name: 'User',
+      username: 'testuser_' + testId
+    };
   },
 
   // Apply Telegram theme colors
@@ -59,6 +81,7 @@ const TelegramApp = {
     if (!this.webApp) return;
     
     const theme = this.webApp.themeParams;
+    console.log('Theme params:', theme);
     
     if (theme.bg_color) {
       document.documentElement.style.setProperty('--tg-bg-color', theme.bg_color);
@@ -76,22 +99,29 @@ const TelegramApp = {
 
   // Get user ID
   getUserId() {
-    return this.user ? this.user.id : null;
+    const id = this.user ? this.user.id : null;
+    console.log('getUserId() =', id);
+    return id;
   },
 
   // Get display name
   getDisplayName() {
-    if (!this.user) return 'Player';
+    if (!this.user) {
+      console.log('getDisplayName(): no user');
+      return 'Player';
+    }
     
+    let name;
     if (this.user.username) {
-      return '@' + this.user.username;
+      name = '@' + this.user.username;
+    } else {
+      name = this.user.first_name || '';
+      if (this.user.last_name) {
+        name += ' ' + this.user.last_name;
+      }
     }
     
-    let name = this.user.first_name || '';
-    if (this.user.last_name) {
-      name += ' ' + this.user.last_name;
-    }
-    
+    console.log('getDisplayName() =', name);
     return name || 'Player';
   },
 
@@ -113,7 +143,7 @@ const TelegramApp = {
 
   // Show alert
   showAlert(message) {
-    if (this.webApp) {
+    if (this.webApp && this.webApp.showAlert) {
       this.webApp.showAlert(message);
     } else {
       alert(message);
@@ -122,7 +152,7 @@ const TelegramApp = {
 
   // Show confirm
   showConfirm(message, callback) {
-    if (this.webApp) {
+    if (this.webApp && this.webApp.showConfirm) {
       this.webApp.showConfirm(message, callback);
     } else {
       const result = confirm(message);
@@ -132,8 +162,12 @@ const TelegramApp = {
 
   // Haptic feedback
   hapticImpact(style = 'medium') {
-    if (this.webApp && this.webApp.HapticFeedback) {
-      this.webApp.HapticFeedback.impactOccurred(style);
+    try {
+      if (this.webApp && this.webApp.HapticFeedback) {
+        this.webApp.HapticFeedback.impactOccurred(style);
+      }
+    } catch (e) {
+      // Ignore haptic errors
     }
   },
 
@@ -141,6 +175,7 @@ const TelegramApp = {
   ready() {
     if (this.webApp) {
       this.webApp.ready();
+      console.log('✅ Telegram WebApp ready() called');
     }
   },
 
@@ -153,29 +188,45 @@ const TelegramApp = {
 
   // Enable closing confirmation
   enableClosingConfirmation() {
-    if (this.webApp) {
-      this.webApp.enableClosingConfirmation();
+    try {
+      if (this.webApp && this.webApp.enableClosingConfirmation) {
+        this.webApp.enableClosingConfirmation();
+      }
+    } catch (e) {
+      // Ignore
     }
   },
 
   // Disable closing confirmation
   disableClosingConfirmation() {
-    if (this.webApp) {
-      this.webApp.disableClosingConfirmation();
+    try {
+      if (this.webApp && this.webApp.disableClosingConfirmation) {
+        this.webApp.disableClosingConfirmation();
+      }
+    } catch (e) {
+      // Ignore
     }
   },
 
   // Set header color
   setHeaderColor(color) {
-    if (this.webApp) {
-      this.webApp.setHeaderColor(color);
+    try {
+      if (this.webApp && this.webApp.setHeaderColor) {
+        this.webApp.setHeaderColor(color);
+      }
+    } catch (e) {
+      // Ignore
     }
   },
 
   // Set background color
   setBackgroundColor(color) {
-    if (this.webApp) {
-      this.webApp.setBackgroundColor(color);
+    try {
+      if (this.webApp && this.webApp.setBackgroundColor) {
+        this.webApp.setBackgroundColor(color);
+      }
+    } catch (e) {
+      // Ignore
     }
   }
 };

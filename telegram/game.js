@@ -215,6 +215,8 @@ document.getElementById('startGameBtn').addEventListener('click', async () => {
 // =====================
 
 async function showScreen(screenId) {
+  console.log('showScreen:', screenId);
+  
   document.querySelectorAll('.screen').forEach(screen => {
     screen.classList.remove('active');
   });
@@ -317,17 +319,53 @@ function hideModal(modalId) {
 // =====================
 
 async function updateMenuUI() {
-  if (!playerData || !TelegramApp.user) return;
+  console.log('=== updateMenuUI ===');
+  console.log('playerData:', playerData);
+  console.log('TelegramApp.user:', TelegramApp.user);
   
-  document.getElementById('userName').textContent = TelegramApp.getDisplayName();
-  document.getElementById('playerCoins').textContent = playerData.coins || 0;
-  document.getElementById('playerHighScore').textContent = playerData.high_score || 0;
-  document.getElementById('gamesPlayed').textContent = playerData.games_played || 0;
+  if (!TelegramApp.user) {
+    console.warn('No TelegramApp.user!');
+    return;
+  }
   
-  const rank = await SupabaseTelegram.getPlayerRank(TelegramApp.getUserId());
-  document.getElementById('playerRank').textContent = rank ? `#${rank}` : '-';
+  // Set username
+  const displayName = TelegramApp.getDisplayName();
+  console.log('displayName:', displayName);
+  document.getElementById('userName').textContent = displayName;
   
-  document.getElementById('shopCoins').textContent = playerData.coins || 0;
+  // Set stats
+  if (playerData) {
+    const coins = playerData.coins || 0;
+    const highScore = playerData.high_score || 0;
+    const gamesPlayed = playerData.games_played || 0;
+    
+    console.log('Setting stats - Coins:', coins, 'HighScore:', highScore, 'Games:', gamesPlayed);
+    
+    document.getElementById('playerCoins').textContent = coins;
+    document.getElementById('playerHighScore').textContent = highScore;
+    document.getElementById('gamesPlayed').textContent = gamesPlayed;
+    
+    // Get rank
+    try {
+      const rank = await SupabaseTelegram.getPlayerRank(TelegramApp.getUserId());
+      document.getElementById('playerRank').textContent = rank ? `#${rank}` : '-';
+    } catch (e) {
+      console.error('Error getting rank:', e);
+      document.getElementById('playerRank').textContent = '-';
+    }
+    
+    // Update shop coins display
+    const shopCoins = document.getElementById('shopCoins');
+    if (shopCoins) {
+      shopCoins.textContent = coins;
+    }
+  } else {
+    console.warn('No playerData - setting defaults');
+    document.getElementById('playerCoins').textContent = '0';
+    document.getElementById('playerHighScore').textContent = '0';
+    document.getElementById('gamesPlayed').textContent = '0';
+    document.getElementById('playerRank').textContent = '-';
+  }
 }
 
 function getRarityColor(rarity) {
@@ -625,19 +663,74 @@ function updateSkinPreview(colors) {
 // =====================
 
 async function handleGameOver(finalScore, coinsEarned) {
+  console.log('========================================');
+  console.log('🎮 GAME OVER');
+  console.log('  Final Score:', finalScore);
+  console.log('  Coins Earned:', coinsEarned);
+  console.log('  User ID:', TelegramApp.getUserId());
+  console.log('  Session Token:', currentGameSession?.sessionToken);
+  console.log('========================================');
+  
   TelegramApp.hapticImpact('heavy');
   
-  const isNewRecord = finalScore > (playerData?.high_score || 0);
+  const previousHighScore = playerData?.high_score || 0;
+  const isNewRecord = finalScore > previousHighScore;
   
-  // End game session
-  if (currentGameSession?.sessionToken) {
-    await SupabaseTelegram.endGameSession(
-      currentGameSession.sessionToken,
-      finalScore,
-      TelegramApp.getUserId(),
-      TelegramApp.user
-    );
+  console.log('Previous high score:', previousHighScore);
+  console.log('Is new record:', isNewRecord);
+  
+  try {
+    // End game session and save stats
+    if (currentGameSession?.sessionToken) {
+      console.log('Ending game session via token...');
+      
+      const result = await SupabaseTelegram.endGameSession(
+        currentGameSession.sessionToken,
+        finalScore,
+        TelegramApp.getUserId(),
+        TelegramApp.user
+      );
+      
+      console.log('End session result:', result);
+    } else {
+      // Fallback: save directly without session
+      console.log('No session token, saving directly...');
+      
+      const userId = TelegramApp.getUserId();
+      const player = await SupabaseTelegram.getPlayer(userId);
+      
+      if (player) {
+        const newCoins = (player.coins || 0) + coinsEarned;
+        const newHighScore = Math.max(player.high_score || 0, finalScore);
+        const newGamesPlayed = (player.games_played || 0) + 1;
+        
+        console.log('Updating player:', {
+          coins: newCoins,
+          high_score: newHighScore,
+          games_played: newGamesPlayed
+        });
+        
+        await SupabaseTelegram.updatePlayer(userId, {
+          coins: newCoins,
+          high_score: newHighScore,
+          games_played: newGamesPlayed,
+          equipped_skin: player.equipped_skin || 'knight'
+        });
+        
+        // Update leaderboard
+        if (finalScore > (player.high_score || 0)) {
+          await SupabaseTelegram.updateLeaderboard(userId, finalScore, TelegramApp.user);
+        }
+      }
+    }
+    
+    // Reload player data
+    console.log('Reloading player data...');
     playerData = await SupabaseTelegram.getPlayer(TelegramApp.getUserId());
+    console.log('Updated player data:', playerData);
+    
+  } catch (error) {
+    console.error('Error saving game results:', error);
   }
   
   // Show game over modal
@@ -646,11 +739,14 @@ async function handleGameOver(finalScore, coinsEarned) {
   document.getElementById('newRecordBadge').style.display = isNewRecord ? 'inline-block' : 'none';
   
   showModal('gameOverModal');
+  
+  // Update menu UI
+  await updateMenuUI();
 }
 
 document.getElementById('gameOverCloseBtn').addEventListener('click', () => {
   hideModal('gameOverModal');
-  updateMenuUI();
+  showScreen('menuScreen');
 });
 
 // =====================
@@ -688,8 +784,11 @@ let hasShield = false;
 let hasGhost = false;
 
 async function startNewGame() {
+  console.log('=== startNewGame ===');
+  
   try {
     currentGameSession = await SupabaseTelegram.startGameSession(TelegramApp.getUserId());
+    console.log('Game session started:', currentGameSession);
   } catch (error) {
     console.warn('Could not start game session:', error);
     currentGameSession = null;
@@ -700,6 +799,8 @@ async function startNewGame() {
 }
 
 function initGame() {
+  console.log('=== initGame ===');
+  
   snake = [{ 
     x: Math.floor(gameFieldWidth / box / 2) * box + gameFieldStartX, 
     y: Math.floor(gameFieldHeight / box / 2) * box + gameFieldStartY, 
@@ -764,6 +865,8 @@ function initGame() {
   document.getElementById('score').textContent = score;
   document.getElementById('highScore').textContent = highScore;
   food = spawnFood();
+  
+  console.log('Game initialized. HighScore:', highScore, 'CoinMultiplier:', coinMultiplier);
 }
 
 // Keyboard controls
@@ -1222,6 +1325,7 @@ function collision(head, array) {
 }
 
 function onGameOver() {
+  console.log('onGameOver called. Score:', score, 'Coins:', coinsEarnedThisGame);
   drawGameOverCanvas();
   handleGameOver(score, coinsEarnedThisGame);
 }
@@ -1269,32 +1373,65 @@ function gameLoop(timestamp) {
 // =====================
 
 async function initApp() {
-  console.log('Initializing Telegram app...');
+  console.log('========================================');
+  console.log('🎮 SNAKE GAME INITIALIZATION');
+  console.log('========================================');
   
   try {
-    // Initialize Telegram
+    // Step 1: Initialize Telegram
+    console.log('Step 1: Initializing Telegram...');
     await TelegramApp.init();
     TelegramApp.ready();
     
     const userId = TelegramApp.getUserId();
-    console.log('Telegram user ID:', userId);
+    console.log('Step 2: User ID =', userId);
+    console.log('Step 2: User =', JSON.stringify(TelegramApp.user, null, 2));
     
-    // Load or create player
-    playerData = await SupabaseTelegram.getPlayer(userId);
-    
-    if (!playerData) {
-      playerData = await SupabaseTelegram.createPlayer(userId, TelegramApp.user);
+    if (!userId) {
+      console.error('❌ NO USER ID!');
+      document.querySelector('.loading-content h2').textContent = 'Error: No user ID';
+      return;
     }
     
-    // Update UI
+    // Step 3: Test Supabase connection
+    console.log('Step 3: Testing Supabase...');
+    const connectionOk = await SupabaseTelegram.testConnection();
+    console.log('Step 3: Connection =', connectionOk ? '✅ OK' : '❌ FAILED');
+    
+    if (!connectionOk) {
+      console.error('❌ Supabase connection failed!');
+      document.querySelector('.loading-content h2').textContent = 'Error: Database connection failed';
+      return;
+    }
+    
+    // Step 4: Load or create player
+    console.log('Step 4: Loading player...');
+    playerData = await SupabaseTelegram.getPlayer(userId);
+    console.log('Step 4: Player =', JSON.stringify(playerData, null, 2));
+    
+    if (!playerData) {
+      console.log('Step 5: Creating new player...');
+      playerData = await SupabaseTelegram.createPlayer(userId, TelegramApp.user);
+      console.log('Step 5: Created =', JSON.stringify(playerData, null, 2));
+    } else {
+      console.log('Step 5: Player exists, skipping creation');
+    }
+    
+    // Step 6: Update UI
+    console.log('Step 6: Updating UI...');
     await updateMenuUI();
     
     // Hide loading screen
     document.getElementById('loadingScreen').classList.add('hidden');
     
+    console.log('========================================');
+    console.log('✅ INITIALIZATION COMPLETE');
+    console.log('========================================');
+    
   } catch (error) {
-    console.error('Initialization error:', error);
-    document.querySelector('.loading-content h2').textContent = 'Error loading game';
+    console.error('❌ INITIALIZATION ERROR:', error);
+    console.error('Stack:', error.stack);
+    document.querySelector('.loading-content h2').textContent = 'Error: ' + error.message;
   }
 }
 
