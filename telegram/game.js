@@ -380,6 +380,10 @@ async function renderLeaderboard() {
   const container = document.getElementById('leaderboardList');
   const data = await SupabaseTelegram.getLeaderboard(currentLeaderboardPage, 10);
   
+  // Получаем текущий ID пользователя
+  const currentUserId = TelegramApp.getUserId();
+  console.log('Current user ID for leaderboard:', currentUserId);
+  
   container.innerHTML = '';
   
   if (data.players.length === 0) {
@@ -387,8 +391,12 @@ async function renderLeaderboard() {
   } else {
     data.players.forEach((player, index) => {
       const globalRank = (currentLeaderboardPage - 1) * 10 + index + 1;
-      const isCurrentPlayer = TelegramApp.getUserId() && 
-        player.telegramId === TelegramApp.getUserId();
+      
+      // Сравниваем как числа, приводя оба значения к строке для надёжности
+      const isCurrentPlayer = currentUserId && 
+        String(player.telegramId) === String(currentUserId);
+      
+      console.log('Comparing:', player.telegramId, 'vs', currentUserId, '=', isCurrentPlayer);
       
       let rankClass = '';
       let rankIcon = '';
@@ -397,12 +405,17 @@ async function renderLeaderboard() {
       else if (globalRank === 2) { rankClass = 'silver'; rankIcon = '🥈'; }
       else if (globalRank === 3) { rankClass = 'bronze'; rankIcon = '🥉'; }
       
+      // Всегда маскируем имена других игроков
+      const displayName = isCurrentPlayer 
+        ? (player.displayName + ' (You)') 
+        : maskPlayerName(player.displayName);
+      
       const item = document.createElement('div');
       item.className = `leaderboard-item ${rankClass} ${isCurrentPlayer ? 'current-player' : ''}`;
       item.innerHTML = `
         <span class="rank">${globalRank}</span>
         <span class="rank-icon">${rankIcon}</span>
-        <span class="player">${player.displayName}</span>
+        <span class="player">${displayName}</span>
         <span class="lb-score">${player.highScore}</span>
       `;
       container.appendChild(item);
@@ -413,6 +426,32 @@ async function renderLeaderboard() {
     `Page ${data.currentPage} of ${data.totalPages}`;
   document.getElementById('prevPageBtn').disabled = data.currentPage <= 1;
   document.getElementById('nextPageBtn').disabled = data.currentPage >= data.totalPages;
+}
+
+// =====================
+// MASK PLAYER NAME
+// =====================
+
+function maskPlayerName(name) {
+  if (!name) {
+    return 'Player';
+  }
+  
+  // Если имя слишком короткое - маскируем полностью
+  if (name.length <= 3) {
+    return name.charAt(0) + '**';
+  }
+  
+  // Показываем первые 2 символа и последний, остальное скрываем
+  const visibleStart = 2;
+  const visibleEnd = 1;
+  const hiddenLength = name.length - visibleStart - visibleEnd;
+  
+  if (hiddenLength <= 0) {
+    return name.charAt(0) + '*'.repeat(name.length - 1);
+  }
+  
+  return name.slice(0, visibleStart) + '*'.repeat(hiddenLength) + name.slice(-visibleEnd);
 }
 
 document.getElementById('prevPageBtn').addEventListener('click', async () => {
