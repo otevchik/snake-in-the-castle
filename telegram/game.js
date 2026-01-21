@@ -404,6 +404,12 @@ async function renderLeaderboard() {
   const container = document.getElementById('leaderboardList');
   const data = await SupabaseTelegram.getLeaderboard(currentLeaderboardPage, 10);
   
+  // Получаем ID текущего пользователя и приводим к числу
+  const currentUserId = TelegramApp.getUserId();
+  const currentUserIdNum = currentUserId ? Number(currentUserId) : null;
+  
+  console.log('Leaderboard - Current user ID:', currentUserIdNum);
+  
   container.innerHTML = '';
   
   if (data.players.length === 0) {
@@ -414,6 +420,16 @@ async function renderLeaderboard() {
   data.players.forEach((player, index) => {
     const globalRank = (currentLeaderboardPage - 1) * 10 + index + 1;
     
+    // Приводим ID игрока к числу для сравнения
+    const playerIdNum = player.telegramId ? Number(player.telegramId) : null;
+    
+    // Проверяем, это текущий пользователь или нет
+    const isCurrentPlayer = currentUserIdNum !== null && 
+                           playerIdNum !== null && 
+                           currentUserIdNum === playerIdNum;
+    
+    console.log(`Player ${index}: ID=${playerIdNum}, Current=${currentUserIdNum}, Match=${isCurrentPlayer}`);
+    
     let rankClass = '';
     let rankIcon = '';
     
@@ -421,15 +437,18 @@ async function renderLeaderboard() {
     else if (globalRank === 2) { rankClass = 'silver'; rankIcon = '🥈'; }
     else if (globalRank === 3) { rankClass = 'bronze'; rankIcon = '🥉'; }
     
-    // Всегда маскируем все имена для приватности
+    // Маскируем имя для приватности
     const maskedName = maskPlayerName(player.displayName);
     
+    // Добавляем "(You)" если это текущий пользователь
+    const displayName = isCurrentPlayer ? maskedName + ' 👈' : maskedName;
+    
     const item = document.createElement('div');
-    item.className = `leaderboard-item ${rankClass}`;
+    item.className = `leaderboard-item ${rankClass} ${isCurrentPlayer ? 'current-player' : ''}`;
     item.innerHTML = `
       <span class="rank">${globalRank}</span>
       <span class="rank-icon">${rankIcon}</span>
-      <span class="player">${maskedName}</span>
+      <span class="player">${displayName}</span>
       <span class="lb-score">${player.highScore}</span>
     `;
     container.appendChild(item);
