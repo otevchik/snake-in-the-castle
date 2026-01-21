@@ -231,36 +231,62 @@ const SupabaseTelegram = {
   // =====================
   
   async getLeaderboard(page = 1, perPage = 10) {
-    try {
-      // Get total count
-      const countData = await this.request('telegram_leaderboard?select=telegram_id');
-      const totalPlayers = Array.isArray(countData) ? countData.length : 0;
-      const totalPages = Math.ceil(totalPlayers / perPage) || 1;
-      
-      // Get paginated data
-      const offset = (page - 1) * perPage;
-      const players = await this.request(
-        `telegram_leaderboard?select=telegram_id,username,first_name,high_score,created_at,updated_at&order=high_score.desc&limit=${perPage}&offset=${offset}`
-      );
-      
-      return {
-        players: players ? players.map(p => ({
-          telegramId: p.telegram_id,
-          username: p.username,
-          firstName: p.first_name,
-          displayName: p.username ? '@' + p.username : p.first_name || 'Player',
-          highScore: p.high_score,
-          createdAt: p.created_at,
-          updatedAt: p.updated_at
-        })) : [],
-        currentPage: page,
-        totalPages,
-        totalPlayers
-      };
-    } catch (error) {
-      this.error('Error getting leaderboard:', error);
-      return { players: [], currentPage: 1, totalPages: 1, totalPlayers: 0 };
-    }
+  try {
+    // Get total count
+    const countData = await this.request('telegram_leaderboard?select=telegram_id');
+    const totalPlayers = Array.isArray(countData) ? countData.length : 0;
+    const totalPages = Math.ceil(totalPlayers / perPage) || 1;
+    
+    // Get paginated data
+    const offset = (page - 1) * perPage;
+    const players = await this.request(
+      `telegram_leaderboard?select=telegram_id,username,first_name,high_score,created_at,updated_at&order=high_score.desc&limit=${perPage}&offset=${offset}`
+    );
+    
+    return {
+      players: players ? players.map(p => ({
+        telegramId: p.telegram_id,
+        username: p.username,
+        firstName: p.first_name,
+        displayName: this.maskName(p.username, p.first_name),
+        highScore: p.high_score,
+        createdAt: p.created_at,
+        updatedAt: p.updated_at
+      })) : [],
+      currentPage: page,
+      totalPages,
+      totalPlayers
+    };
+  } catch (error) {
+    this.error('Error getting leaderboard:', error);
+    return { players: [], currentPage: 1, totalPages: 1, totalPlayers: 0 };
+  }
+},
+
+// Функция маскировки имени
+maskName(username, firstName) {
+  let name = '';
+  
+  if (username) {
+    name = '@' + username;
+  } else if (firstName) {
+    name = firstName;
+  } else {
+    return 'Player';
+  }
+  
+  // Если имя слишком короткое, показываем как есть
+  if (name.length <= 3) {
+    return name;
+  }
+  
+  // Показываем первые 2 символа и последний, остальное скрываем
+  const visibleStart = 2;
+  const visibleEnd = 1;
+  const hiddenLength = name.length - visibleStart - visibleEnd;
+  const masked = name.slice(0, visibleStart) + '•'.repeat(hiddenLength) + name.slice(-visibleEnd);
+  
+  return masked;
   },
   
   async updateLeaderboard(telegramId, score, userData) {
