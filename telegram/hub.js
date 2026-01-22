@@ -4,12 +4,10 @@
 
 let hubPlayerData = null;
 
-// Initialize Hub
 async function initHub() {
   console.log('🎮 Initializing Game Hub...');
   
   try {
-    // Initialize Telegram
     await TelegramApp.init();
     TelegramApp.ready();
     
@@ -21,21 +19,18 @@ async function initHub() {
       return;
     }
     
-    // Load player data from Supabase
     hubPlayerData = await SupabaseHub.getHubPlayer(userId);
+    console.log('Hub player data:', hubPlayerData);
     
     if (!hubPlayerData) {
       hubPlayerData = await SupabaseHub.createHubPlayer(userId, TelegramApp.user);
     }
     
-    // Update UI
     updateHubUI();
     
-    // Hide loading, show hub
     document.getElementById('loadingScreen').classList.add('hidden');
     document.getElementById('hubScreen').classList.remove('hidden');
     
-    // Setup game cards
     setupGameCards();
     
     console.log('✅ Hub initialized!');
@@ -50,27 +45,35 @@ function updateHubUI() {
   document.getElementById('userName').textContent = TelegramApp.getDisplayName();
   
   if (hubPlayerData) {
+    // Общая статистика
     document.getElementById('totalCoins').textContent = hubPlayerData.total_coins || 0;
     document.getElementById('totalGames').textContent = hubPlayerData.total_games_played || 0;
-    document.getElementById('snakeHighScore').textContent = hubPlayerData.snake_high_score || 0;
     
-    // Space Ship high score (нужно добавить загрузку)
-    const spaceHighScore = document.getElementById('spaceHighScore');
-    if (spaceHighScore) {
-      spaceHighScore.textContent = hubPlayerData.space_high_score || 0;
+    // Статистика по играм
+    const snakeScore = document.getElementById('snakeHighScore');
+    if (snakeScore) {
+      snakeScore.textContent = hubPlayerData.snake_high_score || 0;
+    }
+    
+    const spaceScore = document.getElementById('spaceHighScore');
+    if (spaceScore) {
+      spaceScore.textContent = hubPlayerData.space_high_score || 0;
     }
   }
 }
 
 function setupGameCards() {
-  document.querySelectorAll('.game-card').forEach(card => {
+  const gameCards = document.querySelectorAll('.game-card');
+  console.log('Found game cards:', gameCards.length);
+  
+  gameCards.forEach(card => {
+    const game = card.dataset.game;
+    const isComingSoon = card.classList.contains('coming-soon');
+    
     card.addEventListener('click', () => {
-      const game = card.dataset.game;
+      console.log('Clicked:', game);
       
-      console.log('Clicked game:', game); // Для отладки
-      console.log('Has coming-soon:', card.classList.contains('coming-soon'));
-      
-      if (card.classList.contains('coming-soon')) {
+      if (isComingSoon) {
         TelegramApp.hapticImpact('light');
         showToast('Coming soon! 🚀');
         return;
@@ -87,16 +90,15 @@ function setupGameCards() {
 function openGame(gameId) {
   console.log('Opening game:', gameId);
   
-  switch (gameId) {
-    case 'snake':
-      window.location.href = './games/snake/index.html';
-      break;
-    case 'space-ship':
-      window.location.href = './games/space-ship/index.html';
-      break;
-    default:
-      console.error('Unknown game:', gameId);
-      showToast('Game not found: ' + gameId);
+  const id = gameId.toLowerCase().trim();
+  
+  if (id === 'snake') {
+    window.location.href = './games/snake/index.html';
+  } else if (id === 'space-ship') {
+    window.location.href = './games/space-ship/index.html';
+  } else {
+    console.error('Unknown game:', gameId);
+    showToast('Game not found');
   }
 }
 
@@ -118,16 +120,20 @@ function showToast(message) {
     border-radius: 25px;
     font-size: 14px;
     z-index: 1000;
-    animation: fadeIn 0.3s ease;
   `;
   document.body.appendChild(toast);
   
-  setTimeout(() => toast.remove(), 2500);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transition = 'opacity 0.3s';
+    setTimeout(() => toast.remove(), 300);
+  }, 2500);
 }
 
 function showError(message) {
   document.querySelector('.loading-content h2').textContent = message;
-  document.querySelector('.loading-spinner').style.display = 'none';
+  const spinner = document.querySelector('.loading-spinner');
+  if (spinner) spinner.style.display = 'none';
 }
 
 // Start
