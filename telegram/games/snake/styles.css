@@ -11,33 +11,72 @@
   --tg-button-text-color: #ffffff;
 }
 
-.back-to-hub {
-  position: fixed;
-  top: 10px;
-  left: 10px;
-
-  background: rgba(0, 0, 0, 0.65);
-  color: #fff;
-  border: 1px solid rgba(255,255,255,0.15);
-
-  padding: 8px 14px;
-  border-radius: 999px;
-  font-size: 13px;
-  line-height: 1;
-
+/* Donate Button */
+.donate-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+  border-radius: 12px;
+  padding: 14px 20px;
+  text-decoration: none;
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+  margin-top: 20px;
+  transition: all 0.3s ease;
+  border: none;
   cursor: pointer;
+}
 
-  z-index: 2000;               /* выше игры */
-  backdrop-filter: blur(6px);
+.donate-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(255, 107, 107, 0.4);
+}
+
+.donate-btn:active {
+  transform: scale(0.98);
+}
+
+.donate-icon {
+  font-size: 20px;
+  animation: pulse-heart 1.5s infinite;
+}
+
+@keyframes pulse-heart {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+.donate-text {
+  letter-spacing: 0.5px;
+}
+
+/* Back to Hub Button */
+.back-to-hub {
+  display: block;
+  width: 100%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-bottom: 20px;
+  transition: all 0.3s ease;
+  text-align: center;
+}
+
+.back-to-hub:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
 }
 
 .back-to-hub:active {
   transform: scale(0.98);
-}
-
-/* чтобы верхний контент не залезал под фикс-кнопку */
-.app-container {
-  padding-top: 55px; /* подберите 50-65px как нравится */
 }
 
 body {
