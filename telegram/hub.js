@@ -47,14 +47,18 @@ async function initHub() {
 }
 
 function updateHubUI() {
-  // User name
   document.getElementById('userName').textContent = TelegramApp.getDisplayName();
   
-  // Stats
   if (hubPlayerData) {
     document.getElementById('totalCoins').textContent = hubPlayerData.total_coins || 0;
     document.getElementById('totalGames').textContent = hubPlayerData.total_games_played || 0;
     document.getElementById('snakeHighScore').textContent = hubPlayerData.snake_high_score || 0;
+    
+    // Space Ship high score (нужно добавить загрузку)
+    const spaceHighScore = document.getElementById('spaceHighScore');
+    if (spaceHighScore) {
+      spaceHighScore.textContent = hubPlayerData.space_high_score || 0;
+    }
   }
 }
 
@@ -62,6 +66,9 @@ function setupGameCards() {
   document.querySelectorAll('.game-card').forEach(card => {
     card.addEventListener('click', () => {
       const game = card.dataset.game;
+      
+      console.log('Clicked game:', game); // Для отладки
+      console.log('Has coming-soon:', card.classList.contains('coming-soon'));
       
       if (card.classList.contains('coming-soon')) {
         TelegramApp.hapticImpact('light');
@@ -84,8 +91,12 @@ function openGame(gameId) {
     case 'snake':
       window.location.href = './games/snake/index.html';
       break;
+    case 'space-ship':
+      window.location.href = './games/space-ship/index.html';
+      break;
     default:
-      showToast('Game not found');
+      console.error('Unknown game:', gameId);
+      showToast('Game not found: ' + gameId);
   }
 }
 
