@@ -8,9 +8,6 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <button class="back-to-hub" onclick="window.location.href='../../index.html'">
-  ← Back to Hub
-  </button>
   <!-- Loading Screen -->
   <div id="loadingScreen" class="loading-screen">
     <div class="loading-content">
@@ -25,6 +22,12 @@
     <!-- Main Menu Screen -->
     <div id="menuScreen" class="screen active">
       <div class="menu-container">
+        
+        <!-- Кнопка Back to Hub здесь, в начале меню -->
+        <button class="back-to-hub" onclick="window.location.href='../../index.html'">
+          ← Back to Hub
+        </button>
+        
         <div class="menu-header">
           <h1>🏰 Snake in the Castle 🏰</h1>
           <div class="user-info">
@@ -283,8 +286,8 @@
     
   </div>
   
-  <script src="../../telegram.js"></script>
-<script src="supabase-telegram.js"></script>
-<script src="game.js"></script>
+  <script src="../../telegram.js?v=1"></script>
+  <script src="supabase-telegram.js?v=1"></script>
+  <script src="game.js?v=1"></script>
 </body>
 </html>
