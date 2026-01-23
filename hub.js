@@ -210,18 +210,26 @@ const Hub = {
     document.getElementById('spaceHighScore').textContent = stats.spaceHighScore || 0;
   },
 
-  openGame(game) {
-    const urls = {
-      'snake': '/games/snake/index.html',
-      'space-ship': '/games/space-ship/index.html'
-    };
+ openGame(game) {
+  const urls = {
+    'snake': 'games/snake/',
+    'space-ship': 'games/space-ship/'
+  };
 
-    if (!urls[game]) return;
+  if (!urls[game]) return;
 
-    const url = new URL(urls[game], window.location.origin);
-    if (this.devMode) url.searchParams.set('dev', 'true');
-    window.location.href = url.toString();
-  },
+  // базовый путь репозитория (snake-in-the-castle)
+  const basePath = window.location.pathname.replace(/\/[^\/]*$/, '');
+
+  const url = new URL(`${basePath}/${urls[game]}`, window.location.origin);
+
+  if (this.devMode) {
+    url.searchParams.set('dev', 'true');
+  }
+
+  window.location.href = url.toString();
+},
+
 
   toggleDevMode() {
     this.devMode = !this.devMode;
