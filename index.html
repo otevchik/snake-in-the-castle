@@ -2,329 +2,192 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Snake in the Castle</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Game Hub - Base</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  
   <!-- Loading Screen -->
   <div id="loadingScreen" class="loading-screen">
-    <div class="loading-content">
-      <div class="loading-icon">🏰</div>
-      <h2>Loading...</h2>
-      <div class="loading-spinner"></div>
+    <div class="loading-spinner"></div>
+  </div>
+
+  <!-- Connect Screen -->
+  <div id="connectScreen" class="screen hidden">
+    <div class="connect-container">
+      <div class="connect-header">
+        <div class="connect-logo">🎮</div>
+        <h1>Game Hub</h1>
+        <p class="connect-subtitle">Connect with Base to play!</p>
+      </div>
+      
+      <div class="wallet-options">
+        <button id="connectBase" class="wallet-btn primary">
+          <div class="wallet-btn-icon">
+            <svg width="28" height="28" viewBox="0 0 111 111" fill="none">
+              <path d="M54.921 110.034C85.359 110.034 110.034 85.402 110.034 55.017C110.034 24.6319 85.359 0 54.921 0C26.0432 0 2.35281 22.1714 0 50.3923H72.8467V59.6416H0C2.35281 87.8625 26.0432 110.034 54.921 110.034Z" fill="white"/>
+            </svg>
+          </div>
+          <div class="wallet-btn-content">
+            <span class="wallet-btn-title">Continue with Base</span>
+            <span class="wallet-btn-subtitle">Smart Wallet</span>
+          </div>
+          <div class="wallet-btn-arrow">→</div>
+        </button>
+        
+        <button id="connectCoinbase" class="wallet-btn secondary">
+          <div class="wallet-btn-icon">
+            <svg width="28" height="28" viewBox="0 0 1024 1024" fill="none">
+              <rect width="1024" height="1024" rx="512" fill="#0052FF"/>
+              <path fill-rule="evenodd" clip-rule="evenodd" d="M152 512C152 710.823 313.177 872 512 872C710.823 872 872 710.823 872 512C872 313.177 710.823 152 512 152C313.177 152 152 313.177 152 512ZM420 396C406.745 396 396 406.745 396 420V604C396 617.255 406.745 628 420 628H604C617.255 628 628 617.255 628 604V420C628 406.745 617.255 396 604 396H420Z" fill="white"/>
+            </svg>
+          </div>
+          <div class="wallet-btn-content">
+            <span class="wallet-btn-title">Coinbase Wallet</span>
+            <span class="wallet-btn-subtitle">Mobile & Extension</span>
+          </div>
+        </button>
+
+        <div class="divider"><span>or</span></div>
+      
+
+        <button id="connectDev" class="wallet-btn dev-wallet" style="display: none;">
+          <div class="wallet-btn-icon">🔧</div>
+          <div class="wallet-btn-content">
+            <span class="wallet-btn-title">Dev Wallet</span>
+            <span class="wallet-btn-subtitle">Test without real wallet</span>
+          </div>
+        </button>
+      </div>
+      
+      <p class="connect-info">🔒 We never access your funds.</p>
+      
+      <div class="base-badge">
+        <svg width="14" height="14" viewBox="0 0 111 111" fill="none">
+          <path d="M54.921 110.034C85.359 110.034 110.034 85.402 110.034 55.017C110.034 24.6319 85.359 0 54.921 0C26.0432 0 2.35281 22.1714 0 50.3923H72.8467V59.6416H0C2.35281 87.8625 26.0432 110.034 54.921 110.034Z" fill="currentColor"/>
+        </svg>
+        <span>Built on Base</span>
+      </div>
     </div>
   </div>
 
-  <div class="app-container">
-    
-    <!-- Connect Wallet Screen -->
-    <div id="connectScreen" class="screen active">
-      <div class="connect-container">
-        <div class="logo">
-          <span class="logo-icon">🏰</span>
-          <h1>Snake in the Castle</h1>
-          <p class="tagline">Web3 Medieval Adventure</p>
+  <!-- Hub Screen -->
+  <div id="hubScreen" class="screen hidden">
+    <div class="hub-container">
+      
+      <header class="hub-header">
+        <div class="hub-logo">🎮</div>
+        <h1>Game Hub</h1>
+        <p class="hub-subtitle">Choose your game!</p>
+      </header>
+      
+      <div class="profile-card">
+        <div class="profile-left">
+          <div class="profile-avatar" id="profileAvatar">
+            <img src="" alt="" id="avatarImage" class="hidden">
+            <span id="avatarFallback">👤</span>
+          </div>
+          <div class="profile-info">
+            <span class="profile-name" id="profileName">Player</span>
+            <span class="profile-address" id="profileAddress">0x...</span>
+          </div>
         </div>
-        
-        <div class="wallet-section">
-          <div class="wallet-icon">🦊</div>
-          <h2>Connect Your Wallet</h2>
-          <p>Connect your MetaMask wallet to start playing</p>
-          <button id="connectWalletBtn" class="connect-btn">
-            <span class="btn-icon">🔗</span>
-            Connect MetaMask
-          </button>
-          <p id="walletError" class="error-message"></p>
-        </div>
-        
-        <div class="features">
-          <div class="feature">
-            <span>🎮</span>
-            <p>Play & Earn</p>
+        <div class="profile-right">
+          <div class="network-badge">
+            <span class="network-dot"></span>
+            <span id="networkName">Base</span>
           </div>
-          <div class="feature">
-            <span>🏆</span>
-            <p>Compete</p>
-          </div>
-          <div class="feature">
-            <span>🎨</span>
-            <p>Collect Skins</p>
-          </div>
+          <button id="disconnectBtn" class="disconnect-btn">✕</button>
         </div>
       </div>
-    </div>
-    
-    <!-- Main Menu Screen -->
-    <div id="menuScreen" class="screen">
-      <div class="menu-container">
-        <div class="menu-header">
-          <h1>🏰 Snake in the Castle 🏰</h1>
-          <div class="wallet-info">
-            <span class="wallet-address" id="walletAddress">0x...</span>
-            <span class="network-badge">
-              <span class="network-dot"></span>
-              Base
-            </span>
-            <button id="disconnectBtn" class="disconnect-btn">Disconnect</button>
-          </div>
+      
+      <div class="stats-card">
+        <div class="stat-item">
+          <span class="stat-value" id="totalCoins">0</span>
+          <span class="stat-label">💰 Coins</span>
         </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+          <span class="stat-value" id="totalGames">0</span>
+          <span class="stat-label">🎮 Games</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+          <span class="stat-value" id="totalScore">0</span>
+          <span class="stat-label">⭐ Best</span>
+        </div>
+      </div>
+      
+      <div class="games-section">
+        <h2 class="section-title">🕹️ Games</h2>
         
-        <div class="player-stats">
-          <div class="stat-card">
-            <span class="stat-icon">💰</span>
-            <div class="stat-info">
-              <p class="stat-value" id="playerCoins">0</p>
-              <p class="stat-label">Coins</p>
+        <div class="games-grid">
+          <div class="game-card" data-game="snake">
+            <div class="game-icon">🐍</div>
+            <div class="game-info">
+              <h3>Snake in the Castle</h3>
+              <p>Classic snake game with power-ups!</p>
+              <div class="game-stats">🏆 Best: <span id="snakeHighScore">0</span></div>
             </div>
+            <div class="game-badge available">Play</div>
           </div>
-          <div class="stat-card">
-            <span class="stat-icon">🏆</span>
-            <div class="stat-info">
-              <p class="stat-value" id="playerHighScore">0</p>
-              <p class="stat-label">High Score</p>
+          
+          <div class="game-card" data-game="space-ship">
+            <div class="game-icon">🚀</div>
+            <div class="game-info">
+              <h3>Space Ship</h3>
+              <p>Destroy asteroids, collect coins!</p>
+              <div class="game-stats">🏆 Best: <span id="spaceHighScore">0</span></div>
             </div>
+            <div class="game-badge available">Play</div>
           </div>
-          <div class="stat-card">
-            <span class="stat-icon">🎮</span>
-            <div class="stat-info">
-              <p class="stat-value" id="gamesPlayed">0</p>
-              <p class="stat-label">Games</p>
+          
+          <div class="game-card coming-soon">
+            <div class="game-icon">🧱</div>
+            <div class="game-info">
+              <h3>Tetris</h3>
+              <p>Stack blocks, clear lines!</p>
             </div>
+            <div class="game-badge soon">Coming Soon</div>
           </div>
-          <div class="stat-card">
-            <span class="stat-icon">📊</span>
-            <div class="stat-info">
-              <p class="stat-value" id="playerRank">-</p>
-              <p class="stat-label">Rank</p>
+          
+          <div class="game-card coming-soon">
+            <div class="game-icon">🏓</div>
+            <div class="game-info">
+              <h3>Pong</h3>
+              <p>Classic arcade game</p>
             </div>
-          </div>
-        </div>
-        
-        <div class="menu-buttons">
-          <button class="menu-btn play-btn" data-screen="gameScreen">
-            <span class="btn-icon">🎮</span>
-            Play Game
-          </button>
-          <button class="menu-btn" data-screen="leaderboardScreen">
-            <span class="btn-icon">🏆</span>
-            Leaderboard
-          </button>
-          <button class="menu-btn" data-screen="shopScreen">
-            <span class="btn-icon">🛒</span>
-            Shop
-          </button>
-          <button class="menu-btn" data-screen="inventoryScreen">
-            <span class="btn-icon">🎒</span>
-            Inventory
-          </button>
-          <button class="menu-btn" data-screen="skinsScreen">
-            <span class="btn-icon">🎨</span>
-            Skins
-          </button>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Perks Selection Screen -->
-    <div id="perksScreen" class="screen">
-      <div class="page-container">
-        <div class="page-header">
-          <button class="back-btn" data-screen="menuScreen">← Back</button>
-          <h2>⚔️ Select Power-ups</h2>
-        </div>
-        
-        <p class="perks-info">Select up to 3 power-ups for your game. Each can only be used once!</p>
-        
-        <div id="perksGrid" class="perks-grid">
-          <!-- Populated by JS -->
-        </div>
-        
-        <div class="selected-perks">
-          <h3>Selected Power-ups (<span id="selectedCount">0</span>/3)</h3>
-          <div id="selectedPerksList" class="selected-perks-list">
-            <p class="no-perks">No power-ups selected</p>
-          </div>
-        </div>
-        
-        <button id="startGameBtn" class="start-game-btn">
-          <span class="btn-icon">🎮</span>
-          Start Game
-        </button>
-      </div>
-    </div>
-    
-    <!-- Game Screen -->
-    <div id="gameScreen" class="screen">
-      <div class="game-container">
-        <div class="game-header">
-          <button class="back-btn" data-screen="menuScreen">← Back</button>
-          <div class="game-title">🏰 Snake in the Castle 🏰</div>
-          <div class="game-stats">
-            <span>🍎 <span id="score">0</span></span>
-            <span>🏆 <span id="highScore">0</span></span>
-          </div>
-        </div>
-        
-        <div class="active-perks-bar" id="activePerksBar">
-          <!-- Active perks shown here -->
-        </div>
-        
-        <div class="canvas-wrapper">
-          <canvas id="gameCanvas" width="600" height="600"></canvas>
-        </div>
-        
-        <div class="game-controls">
-          <p class="instructions">Use arrow keys or WASD to control</p>
-          <button id="restartBtn" class="restart-btn">🔄 Restart Game</button>
-        </div>
-        
-        <div class="mobile-controls">
-          <div></div>
-          <button class="control-btn" data-dir="UP">⬆️</button>
-          <div></div>
-          <button class="control-btn" data-dir="LEFT">⬅️</button>
-          <button class="control-btn" data-dir="DOWN">⬇️</button>
-          <button class="control-btn" data-dir="RIGHT">➡️</button>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Leaderboard Screen -->
-    <div id="leaderboardScreen" class="screen">
-      <div class="page-container">
-        <div class="page-header">
-          <button class="back-btn" data-screen="menuScreen">← Back</button>
-          <h2>🏆 Leaderboard</h2>
-        </div>
-        
-        <div class="leaderboard-info">
-          <p>🔐 Scores are verified with wallet signature</p>
-        </div>
-        
-        <div id="leaderboardList" class="leaderboard-list">
-          <!-- Populated by JS -->
-        </div>
-        
-        <div class="pagination">
-          <button id="prevPageBtn" class="page-btn">← Previous</button>
-          <span id="pageInfo" class="page-info">Page 1 of 1</span>
-          <button id="nextPageBtn" class="page-btn">Next →</button>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Shop Screen -->
-    <div id="shopScreen" class="screen">
-      <div class="page-container">
-        <div class="page-header">
-          <button class="back-btn" data-screen="menuScreen">← Back</button>
-          <h2>🛒 Shop</h2>
-          <div class="balance">💰 <span id="shopCoins">0</span></div>
-        </div>
-        
-        <div class="shop-section">
-          <h3 class="section-title">📦 Mystery Case</h3>
-          <div id="caseSection" class="case-section">
-            <!-- Populated by JS -->
-          </div>
-        </div>
-        
-        <div class="shop-section">
-          <h3 class="section-title">🎮 Power-ups</h3>
-          <div id="shopGrid" class="shop-grid">
-            <!-- Populated by JS -->
+            <div class="game-badge soon">Coming Soon</div>
           </div>
         </div>
       </div>
-    </div>
-    
-    <!-- Inventory Screen -->
-    <div id="inventoryScreen" class="screen">
-      <div class="page-container">
-        <div class="page-header">
-          <button class="back-btn" data-screen="menuScreen">← Back</button>
-          <h2>🎒 Inventory</h2>
-        </div>
-        
-        <div id="inventoryGrid" class="inventory-grid">
-          <!-- Populated by JS -->
-        </div>
-        
-        <div id="emptyInventory" class="empty-inventory" style="display: none;">
-          <p>Your inventory is empty!</p>
-          <p>Buy items from the Shop to use them in game.</p>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Skins Screen -->
-    <div id="skinsScreen" class="screen">
-      <div class="page-container">
-        <div class="page-header">
-          <button class="back-btn" data-screen="menuScreen">← Back</button>
-          <h2>🎨 Skins</h2>
-          <div class="balance">💰 <span id="skinsCoins">0</span></div>
-        </div>
-        
-        <div class="skin-preview-section">
-          <div id="skinPreviewBox" class="skin-preview-box">
-            <div class="preview-snake">
-              <div class="preview-segment head"></div>
-              <div class="preview-segment body"></div>
-              <div class="preview-segment body"></div>
-              <div class="preview-segment tail"></div>
-            </div>
+      
+      <div class="support-section">
+        <a href="https://www.donationalerts.com/r/otevchik" target="_blank" class="support-btn">
+          <span class="support-icon">💝</span>
+          <div class="support-text">
+            <span class="support-title">Support the Project</span>
+            <span class="support-subtitle">Help us make more games!</span>
           </div>
-          <p id="equippedSkinName" class="equipped-skin-name">Knight</p>
-        </div>
-        
-        <div id="skinsGrid" class="skins-grid">
-          <!-- Populated by JS -->
-        </div>
+          <span class="support-arrow">→</span>
+        </a>
       </div>
+      
+      <footer class="hub-footer">
+        <div class="footer-base">
+          <svg width="14" height="14" viewBox="0 0 111 111" fill="none">
+            <path d="M54.921 110.034C85.359 110.034 110.034 85.402 110.034 55.017C110.034 24.6319 85.359 0 54.921 0C26.0432 0 2.35281 22.1714 0 50.3923H72.8467V59.6416H0C2.35281 87.8625 26.0432 110.034 54.921 110.034Z" fill="currentColor"/>
+          </svg>
+          <span>Powered by Base</span>
+        </div>
+        <p>More games coming soon! 🚀</p>
+      </footer>
     </div>
-    
-    <!-- Case Opening Modal -->
-    <div id="caseModal" class="modal">
-      <div class="modal-content case-modal">
-        <div id="caseAnimation" class="case-animation">
-          <div class="case-box">📦</div>
-        </div>
-        <div id="caseResult" class="case-result" style="display: none;">
-          <div id="resultIcon" class="result-icon"></div>
-          <h3 id="resultTitle"></h3>
-          <p id="resultRarity" class="result-rarity"></p>
-          <p id="resultMessage" class="result-message"></p>
-          <button id="closeModalBtn" class="modal-btn">Close</button>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Score Submit Modal -->
-    <div id="scoreModal" class="modal">
-      <div class="modal-content score-modal">
-        <h2>🏆 Game Over!</h2>
-        <div class="score-display">
-          <p class="final-score">Score: <span id="finalScore">0</span></p>
-          <p class="coins-earned">+<span id="coinsEarned">0</span> coins</p>
-        </div>
-        <div class="submit-section">
-          <p>Sign with your wallet to submit your score to the leaderboard!</p>
-          <button id="submitScoreBtn" class="submit-btn">
-            <span class="btn-icon">✍️</span>
-            Sign & Submit Score
-          </button>
-          <button id="skipSubmitBtn" class="skip-btn">Skip</button>
-        </div>
-        <p id="submitError" class="error-message"></p>
-      </div>
-    </div>
-    
   </div>
-  
-  <script src="supabase.js"></script>
-  <script src="wallet.js"></script>
-  <script src="game.js"></script>
+
+  <!-- Scripts: только локальные, без ethers -->
+  <script src="base-wallet.js"></script>
+  <script src="hub.js"></script>
 </body>
 </html>

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Space Ship - Game Hub</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  
+  <div id="loadingScreen" class="loading-screen">
+    <div class="loading-spinner"></div>
+  </div>
+
+  <div class="app-container">
+    
+    <!-- Menu Screen -->
+    <div id="menuScreen" class="screen active">
+      <div class="menu-container">
+        
+        <a href="../../index.html" class="back-to-hub">
+          <span>←</span>
+          <span>Back to Hub</span>
+        </a>
+        
+        <div class="menu-header">
+          <div class="game-logo">🚀</div>
+          <h1>Space Ship</h1>
+          <p class="game-subtitle">Destroy asteroids!</p>
+        </div>
+        
+        <div class="wallet-badge">
+          <div class="wallet-avatar" id="walletAvatar">👤</div>
+          <div class="wallet-info">
+            <span class="wallet-address" id="walletAddress">0x...</span>
+          </div>
+          <div class="network-dot"></div>
+        </div>
+        
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span class="stat-icon">💰</span>
+            <span class="stat-value" id="playerCoins">0</span>
+            <span class="stat-label">Coins</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-icon">🏆</span>
+            <span class="stat-value" id="playerHighScore">0</span>
+            <span class="stat-label">Best</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-icon">🎮</span>
+            <span class="stat-value" id="gamesPlayed">0</span>
+            <span class="stat-label">Games</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-icon">☄️</span>
+            <span class="stat-value" id="asteroidsDestroyed">0</span>
+            <span class="stat-label">Destroyed</span>
+          </div>
+        </div>
+        
+        <div class="menu-buttons">
+          <button class="menu-btn primary" data-screen="perksScreen">
+            <span class="btn-icon">🚀</span>
+            <span>Play Game</span>
+          </button>
+          <button class="menu-btn" data-screen="leaderboardScreen">
+            <span class="btn-icon">🏆</span>
+            <span>Leaderboard</span>
+          </button>
+          <button class="menu-btn" data-screen="shopScreen">
+            <span class="btn-icon">🛒</span>
+            <span>Shop</span>
+          </button>
+          <button class="menu-btn" data-screen="inventoryScreen">
+            <span class="btn-icon">🎒</span>
+            <span>Inventory</span>
+          </button>
+          <button class="menu-btn" data-screen="skinsScreen">
+            <span class="btn-icon">🎨</span>
+            <span>Ships</span>
+          </button>
+        </div>
+        
+      </div>
+    </div>
+    
+    <!-- Perks Screen -->
+    <div id="perksScreen" class="screen">
+      <div class="page-container">
+        <div class="page-header">
+          <button class="back-btn" data-screen="menuScreen">← Back</button>
+          <h2>Select Power-ups</h2>
+        </div>
+        
+        <p class="page-desc">Choose up to 3 power-ups for your mission!</p>
+        
+        <div id="perksGrid" class="perks-grid"></div>
+        
+        <div class="selected-perks">
+          <h3>Selected <span id="selectedCount">0</span>/3</h3>
+          <div id="selectedPerksList" class="selected-list">
+            <span class="empty-text">No power-ups selected</span>
+          </div>
+        </div>
+        
+        <button id="startGameBtn" class="start-btn">
+          <span>🚀</span>
+          <span>Launch Mission</span>
+        </button>
+      </div>
+    </div>
+    
+    <!-- Game Screen -->
+    <div id="gameScreen" class="screen">
+      <div class="game-container">
+        <div class="game-header">
+          <button class="back-btn" data-screen="menuScreen">← Exit</button>
+          <div class="game-score">
+            <span>⭐ <span id="score">0</span></span>
+            <span>💰 <span id="coinsCollected">0</span></span>
+            <span>❤️ <span id="lives">3</span></span>
+          </div>
+        </div>
+        
+        <div class="active-perks" id="activePerksBar"></div>
+        
+        <div class="canvas-wrapper">
+          <canvas id="gameCanvas" width="400" height="600"></canvas>
+        </div>
+        
+        <div class="mobile-controls">
+          <button class="control-btn move-btn" data-dir="LEFT">←</button>
+          <button class="control-btn fire-btn" id="fireBtn">🔥</button>
+          <button class="control-btn move-btn" data-dir="RIGHT">→</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Leaderboard Screen -->
+    <div id="leaderboardScreen" class="screen">
+      <div class="page-container">
+        <div class="page-header">
+          <button class="back-btn" data-screen="menuScreen">← Back</button>
+          <h2>Leaderboard</h2>
+        </div>
+        
+        <div id="leaderboardList" class="leaderboard-list"></div>
+        
+        <div class="pagination">
+          <button id="prevPageBtn" class="page-btn" disabled>←</button>
+          <span id="pageInfo" class="page-info">1 / 1</span>
+          <button id="nextPageBtn" class="page-btn">→</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Shop Screen -->
+    <div id="shopScreen" class="screen">
+      <div class="page-container">
+        <div class="page-header">
+          <button class="back-btn" data-screen="menuScreen">← Back</button>
+          <h2>Shop</h2>
+          <div class="header-balance">💰 <span id="shopCoins">0</span></div>
+        </div>
+        
+        <div class="shop-section">
+          <h3 class="section-title">📦 Mystery Crate</h3>
+          <div id="caseSection" class="case-section"></div>
+        </div>
+        
+        <div class="shop-section">
+          <h3 class="section-title">⚡ Power-ups</h3>
+          <div id="shopGrid" class="shop-grid"></div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Inventory Screen -->
+    <div id="inventoryScreen" class="screen">
+      <div class="page-container">
+        <div class="page-header">
+          <button class="back-btn" data-screen="menuScreen">← Back</button>
+          <h2>Inventory</h2>
+        </div>
+        
+        <div id="inventoryGrid" class="inventory-grid"></div>
+        <div id="emptyInventory" class="empty-state hidden">
+          <span class="empty-icon">🎒</span>
+          <p>Your inventory is empty</p>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Skins Screen -->
+    <div id="skinsScreen" class="screen">
+      <div class="page-container">
+        <div class="page-header">
+          <button class="back-btn" data-screen="menuScreen">← Back</button>
+          <h2>Ships</h2>
+          <div class="header-balance">💰 <span id="skinsCoins">0</span></div>
+        </div>
+        
+        <div class="skin-preview">
+          <div class="preview-box">
+            <div class="preview-ship">🚀</div>
+          </div>
+          <span id="equippedSkinName" class="preview-name">Fighter</span>
+        </div>
+        
+        <div id="skinsGrid" class="skins-grid"></div>
+      </div>
+    </div>
+    
+    <!-- Case Modal -->
+    <div id="caseModal" class="modal">
+      <div class="modal-content">
+        <div id="caseAnimation" class="case-animation">
+          <div class="case-box">📦</div>
+        </div>
+        <div id="caseResult" class="case-result hidden">
+          <div id="resultIcon" class="result-icon"></div>
+          <h3 id="resultTitle">Ship Name</h3>
+          <p id="resultRarity" class="result-rarity">Common</p>
+          <p id="resultMessage" class="result-message">Unlocked!</p>
+          <button id="closeModalBtn" class="modal-btn">Continue</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Game Over Modal -->
+    <div id="gameOverModal" class="modal">
+      <div class="modal-content">
+        <h2 class="modal-title">Mission Complete!</h2>
+        <div class="score-display">
+          <span class="final-score">Score: <span id="finalScore">0</span></span>
+          <span class="asteroids-count">☄️ <span id="finalAsteroids">0</span></span>
+          <span class="coins-earned">+<span id="coinsEarned">0</span> 💰</span>
+        </div>
+        <div id="newRecordBadge" class="new-record hidden">🎉 New Record!</div>
+        <button id="gameOverCloseBtn" class="modal-btn">Continue</button>
+      </div>
+    </div>
+    
+  </div>
+  
+  <script src="wallet.js"></script>
+  <script src="supabase-space.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

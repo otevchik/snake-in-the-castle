@@ -48,8 +48,6 @@ const RARITY_COLORS = {
 
 let playerData = null;
 let currentLeaderboardPage = 1;
-let pendingGameScore = 0;
-let pendingCoinsEarned = 0;
 let currentGameSession = null;
 
 // =====================
@@ -60,18 +58,8 @@ let selectedPerks = [];
 let activePerks = {};
 const MAX_PERKS = 3;
 
-const PERK_KEYS = {
-  'extra_life': '1',
-  'shield': '2',
-  'ghost': '3',
-  'slow_start': null,
-  'double_coins': null,
-  'magnet': null
-};
-
 function renderPerksSelection() {
   const container = document.getElementById('perksGrid');
-  
   container.innerHTML = '';
   
   if (!playerData || !playerData.inventory || playerData.inventory.length === 0) {
@@ -96,7 +84,7 @@ function renderPerksSelection() {
     `;
     
     if (!isDisabled || isSelected) {
-      div.addEventListener('click', () => togglePerkSelection(invItem.id, itemData));
+      div.addEventListener('click', () => togglePerkSelection(invItem.id));
     }
     
     container.appendChild(div);
@@ -105,7 +93,7 @@ function renderPerksSelection() {
   updateSelectedPerksList();
 }
 
-function togglePerkSelection(perkId, perkData) {
+function togglePerkSelection(perkId) {
   const index = selectedPerks.indexOf(perkId);
   
   if (index > -1) {
@@ -150,30 +138,25 @@ function updateSelectedPerksList() {
   container.querySelectorAll('.remove-perk').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const perkId = btn.dataset.perk;
-      selectedPerks = selectedPerks.filter(p => p !== perkId);
+      selectedPerks = selectedPerks.filter(p => p !== btn.dataset.perk);
       renderPerksSelection();
     });
   });
 }
 
 async function consumeSelectedPerks() {
+  const walletAddress = WalletApp.getUserId();
   for (const perkId of selectedPerks) {
-    await SupabaseClient.consumeItem(WalletManager.address, perkId);
+    await SupabaseClient.consumeItem(walletAddress, perkId);
   }
-  playerData = await SupabaseClient.getPlayer(WalletManager.address);
+  playerData = await SupabaseClient.getPlayer(walletAddress);
 }
 
 function initializeActivePerks() {
   activePerks = {};
-  
   selectedPerks.forEach(perkId => {
-    activePerks[perkId] = {
-      active: true,
-      used: false
-    };
+    activePerks[perkId] = { active: true, used: false };
   });
-  
   renderActivePerksBar();
 }
 
@@ -192,27 +175,18 @@ function renderActivePerksBar() {
     if (!itemData) return;
     
     const perk = activePerks[perkId];
-    const keyHint = PERK_KEYS[perkId];
-    
     const div = document.createElement('div');
     div.className = `active-perk ${perk.used ? 'used' : ''} ${perk.active && !perk.used ? 'active' : ''}`;
-    div.id = `perk-${perkId}`;
-    div.innerHTML = `
-      <span>${itemData.icon}</span>
-      <span>${itemData.name}</span>
-      ${keyHint ? `<span class="perk-key">[${keyHint}]</span>` : ''}
-    `;
+    div.innerHTML = `<span>${itemData.icon}</span><span>${itemData.name}</span>`;
     container.appendChild(div);
   });
 }
 
 function usePerk(perkId) {
   if (!activePerks[perkId] || activePerks[perkId].used) return false;
-  
   activePerks[perkId].used = true;
   activePerks[perkId].active = false;
   renderActivePerksBar();
-  
   return true;
 }
 
@@ -222,6 +196,7 @@ function hasPerk(perkId) {
 
 // Start game button
 document.getElementById('startGameBtn').addEventListener('click', async () => {
+  WalletApp.hapticImpact('medium');
   await consumeSelectedPerks();
   showScreen('gameScreen');
 });
@@ -237,24 +212,27 @@ async function showScreen(screenId) {
   document.getElementById(screenId).classList.add('active');
   
   if (screenId === 'gameScreen') {
+    WalletApp.enableClosingConfirmation();
     initializeActivePerks();
     await startNewGame();
-  } else if (animationId) {
-    cancelAnimationFrame(animationId);
-    animationId = null;
+  } else {
+    WalletApp.disableClosingConfirmation();
+    if (animationId) {
+      cancelAnimationFrame(animationId);
+      animationId = null;
+    }
   }
   
   if (screenId === 'perksScreen') {
     selectedPerks = [];
     activePerks = {};
-    
     document.getElementById('selectedCount').textContent = '0';
     document.getElementById('selectedPerksList').innerHTML = '<p class="no-perks">No power-ups selected</p>';
     
-    if (WalletManager.address) {
-      playerData = await SupabaseClient.getPlayer(WalletManager.address);
+    const walletAddress = WalletApp.getUserId();
+    if (walletAddress) {
+      playerData = await SupabaseClient.getPlayer(walletAddress);
     }
-    
     renderPerksSelection();
   }
   
@@ -279,10 +257,10 @@ async function showScreen(screenId) {
     selectedPerks = [];
     activePerks = {};
     
-    if (WalletManager.address) {
-      playerData = await SupabaseClient.getPlayer(WalletManager.address);
+    const walletAddress = WalletApp.getUserId();
+    if (walletAddress) {
+      playerData = await SupabaseClient.getPlayer(walletAddress);
     }
-    
     await updateMenuUI();
   }
 }
@@ -290,6 +268,7 @@ async function showScreen(screenId) {
 // Navigation buttons
 document.querySelectorAll('[data-screen]').forEach(btn => {
   btn.addEventListener('click', () => {
+    WalletApp.hapticImpact('light');
     if (btn.dataset.screen === 'gameScreen') {
       showScreen('perksScreen');
     } else {
@@ -299,7 +278,7 @@ document.querySelectorAll('[data-screen]').forEach(btn => {
 });
 
 // =====================
-// TOAST NOTIFICATIONS
+// TOAST & MODAL
 // =====================
 
 function showToast(message, type = 'info') {
@@ -318,10 +297,6 @@ function showToast(message, type = 'info') {
   }, 3000);
 }
 
-// =====================
-// MODAL HANDLERS
-// =====================
-
 function showModal(modalId) {
   document.getElementById(modalId).classList.add('show');
 }
@@ -331,117 +306,27 @@ function hideModal(modalId) {
 }
 
 // =====================
-// WALLET UI HANDLERS
+// UI HANDLERS
 // =====================
 
-async function handleConnectWallet() {
-  const connectBtn = document.getElementById('connectWalletBtn');
-  const errorEl = document.getElementById('walletError');
-  
-  errorEl.textContent = '';
-  
-  if (!WalletManager.isMetaMaskInstalled()) {
-    errorEl.textContent = 'MetaMask is not installed. Please install MetaMask to continue.';
-    return;
-  }
-  
-  try {
-    connectBtn.disabled = true;
-    connectBtn.innerHTML = '<span class="btn-icon">⏳</span> Connecting...';
-    
-    await WalletManager.connect();
-    
-    connectBtn.innerHTML = '<span class="btn-icon">🔄</span> Switching to Base...';
-    connectBtn.innerHTML = '<span class="btn-icon">✍️</span> Sign message...';
-    
-    const { address, signature } = await WalletManager.requestSignature();
-    
-    console.log('Connected:', address);
-    console.log('Network:', WalletManager.getNetworkName());
-    
-    await onWalletConnected(address);
-    
-  } catch (error) {
-    console.error('Connection error:', error);
-    errorEl.textContent = error.message;
-    
-    connectBtn.disabled = false;
-    connectBtn.innerHTML = '<span class="btn-icon">🔗</span> Connect MetaMask';
-  }
-}
-
-async function onWalletConnected(address) {
-  await loadPlayerData(address);
-  await updateMenuUI();
-  showScreen('menuScreen');
-}
-
-function handleDisconnect() {
-  WalletManager.disconnect();
-  playerData = null;
-  
-  const connectBtn = document.getElementById('connectWalletBtn');
-  connectBtn.disabled = false;
-  connectBtn.innerHTML = '<span class="btn-icon">🔗</span> Connect MetaMask';
-  
-  showScreen('connectScreen');
-}
-
-async function loadPlayerData(address) {
-  playerData = await SupabaseClient.getPlayer(address);
-  if (!playerData) {
-    playerData = await SupabaseClient.createPlayer(address);
-  }
-}
-
 async function updateMenuUI() {
-  if (!playerData || !WalletManager.address) return;
+  const walletAddress = WalletApp.getUserId();
+  if (!playerData || !walletAddress) return;
   
-  document.getElementById('walletAddress').textContent = shortenAddress(WalletManager.address);
+  document.getElementById('walletAddress').textContent = WalletApp.getShortAddress();
   
-  document.getElementById('playerCoins').textContent = playerData.coins;
+  document.getElementById('playerCoins').textContent = playerData.coins || 0;
   document.getElementById('playerHighScore').textContent = playerData.high_score || 0;
   document.getElementById('gamesPlayed').textContent = playerData.games_played || 0;
   
-  const rank = await SupabaseClient.getPlayerRank(WalletManager.address);
+  const rank = await SupabaseClient.getPlayerRank(walletAddress);
   document.getElementById('playerRank').textContent = rank ? `#${rank}` : '-';
   
-  document.getElementById('shopCoins').textContent = playerData.coins;
-}
-
-function shortenAddress(address) {
-  if (!address) return '';
-  return address.slice(0, 6) + '...' + address.slice(-4);
+  document.getElementById('shopCoins').textContent = playerData.coins || 0;
 }
 
 function getRarityColor(rarity) {
   return RARITY_COLORS[rarity] || '#9ca3af';
-}
-
-// Event Listeners
-document.getElementById('connectWalletBtn').addEventListener('click', handleConnectWallet);
-document.getElementById('disconnectBtn').addEventListener('click', handleDisconnect);
-
-WalletManager.setupEventListeners({
-  onDisconnect: handleDisconnect,
-  onAccountChange: async (newAddress) => {
-    try {
-      await WalletManager.requestSignature();
-      await onWalletConnected(newAddress);
-    } catch (error) {
-      handleDisconnect();
-    }
-  },
-  onWrongNetwork: async () => {
-    showToast('Please switch to Base network', 'error');
-  }
-});
-
-async function checkExistingSession() {
-  const existing = await WalletManager.checkExistingConnection();
-  if (existing) {
-    await onWalletConnected(existing.address);
-  }
 }
 
 // =====================
@@ -451,39 +336,39 @@ async function checkExistingSession() {
 async function renderLeaderboard() {
   const container = document.getElementById('leaderboardList');
   const data = await SupabaseClient.getLeaderboard(currentLeaderboardPage, 10);
+  const myAddress = WalletApp.getUserId();
   
   container.innerHTML = '';
   
-  if (data.players.length === 0) {
-    container.innerHTML = '<p style="text-align: center; color: #a0a0a0; padding: 40px;">No players yet. Be the first to submit your score!</p>';
-  } else {
-    data.players.forEach((player, index) => {
-      const globalRank = (currentLeaderboardPage - 1) * 10 + index + 1;
-      const isCurrentPlayer = WalletManager.address && 
-        player.address.toLowerCase() === WalletManager.address.toLowerCase();
-      
-      let rankClass = '';
-      let rankIcon = '';
-      
-      if (globalRank === 1) { rankClass = 'gold'; rankIcon = '🥇'; }
-      else if (globalRank === 2) { rankClass = 'silver'; rankIcon = '🥈'; }
-      else if (globalRank === 3) { rankClass = 'bronze'; rankIcon = '🥉'; }
-      
-      const item = document.createElement('div');
-      item.className = `leaderboard-item ${rankClass} ${isCurrentPlayer ? 'current-player' : ''}`;
-      item.innerHTML = `
-        <span class="rank">${globalRank}</span>
-        <span class="rank-icon">${rankIcon}</span>
-        <span class="player">${shortenAddress(player.address)}</span>
-        <span class="lb-score">${player.highScore}</span>
-        <span class="verified">✓</span>
-      `;
-      container.appendChild(item);
-    });
+  if (!data || !data.players || data.players.length === 0) {
+    container.innerHTML = '<p style="text-align: center; color: #a0a0a0; padding: 40px;">No players yet. Be the first!</p>';
+    return;
   }
   
-  document.getElementById('pageInfo').textContent = 
-    `Page ${data.currentPage} of ${data.totalPages}`;
+  data.players.forEach((player, index) => {
+    const globalRank = (currentLeaderboardPage - 1) * 10 + index + 1;
+    const isCurrentPlayer = myAddress && 
+      player.walletAddress.toLowerCase() === myAddress.toLowerCase();
+    
+    let rankClass = '';
+    let rankIcon = '';
+    
+    if (globalRank === 1) { rankClass = 'gold'; rankIcon = '🥇'; }
+    else if (globalRank === 2) { rankClass = 'silver'; rankIcon = '🥈'; }
+    else if (globalRank === 3) { rankClass = 'bronze'; rankIcon = '🥉'; }
+    
+    const item = document.createElement('div');
+    item.className = `leaderboard-item ${rankClass} ${isCurrentPlayer ? 'current-player' : ''}`;
+    item.innerHTML = `
+      <span class="rank">${globalRank}</span>
+      <span class="rank-icon">${rankIcon}</span>
+      <span class="player">${player.displayName}${isCurrentPlayer ? ' 👈' : ''}</span>
+      <span class="lb-score">${player.highScore}</span>
+    `;
+    container.appendChild(item);
+  });
+  
+  document.getElementById('pageInfo').textContent = `Page ${data.currentPage} of ${data.totalPages}`;
   document.getElementById('prevPageBtn').disabled = data.currentPage <= 1;
   document.getElementById('nextPageBtn').disabled = data.currentPage >= data.totalPages;
 }
@@ -507,6 +392,7 @@ document.getElementById('nextPageBtn').addEventListener('click', async () => {
 async function renderShop() {
   const container = document.getElementById('shopGrid');
   const caseSection = document.getElementById('caseSection');
+  const walletAddress = WalletApp.getUserId();
   
   document.getElementById('shopCoins').textContent = playerData?.coins || 0;
   
@@ -523,7 +409,10 @@ async function renderShop() {
     </div>
   `;
   
-  document.getElementById('openCaseBtn').addEventListener('click', openMysteryCase);
+  document.getElementById('openCaseBtn').addEventListener('click', () => {
+    WalletApp.hapticImpact('heavy');
+    openMysteryCase();
+  });
   
   container.innerHTML = '';
   
@@ -546,9 +435,8 @@ async function renderShop() {
   
   container.querySelectorAll('.buy-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
-      const itemId = btn.dataset.item;
-      const price = parseInt(btn.dataset.price);
-      const result = await SupabaseClient.buyItem(WalletManager.address, itemId, price);
+      WalletApp.hapticImpact('medium');
+      const result = await SupabaseClient.buyItem(walletAddress, btn.dataset.item, parseInt(btn.dataset.price));
       
       if (result.success) {
         playerData = result.player;
@@ -567,7 +455,8 @@ async function renderShop() {
 // =====================
 
 async function openMysteryCase() {
-  const result = await SupabaseClient.openCase(WalletManager.address, MYSTERY_CASE.price, ALL_SKINS);
+  const walletAddress = WalletApp.getUserId();
+  const result = await SupabaseClient.openCase(walletAddress, MYSTERY_CASE.price, ALL_SKINS);
   
   if (!result.success) {
     showToast(result.error, 'error');
@@ -581,26 +470,21 @@ async function openMysteryCase() {
   document.getElementById('caseResult').style.display = 'none';
   
   setTimeout(() => {
+    WalletApp.hapticImpact('heavy');
     document.getElementById('caseAnimation').style.display = 'none';
     document.getElementById('caseResult').style.display = 'block';
     
     const skin = result.skin;
-    const rarityColor = getRarityColor(skin.rarity);
-    
     document.getElementById('resultIcon').style.background = 
       `linear-gradient(135deg, ${skin.colors[0]} 0%, ${skin.colors[1]} 100%)`;
     document.getElementById('resultIcon').textContent = skin.icon;
     document.getElementById('resultTitle').textContent = skin.name;
     document.getElementById('resultRarity').textContent = skin.rarity;
-    document.getElementById('resultRarity').style.color = rarityColor;
+    document.getElementById('resultRarity').style.color = getRarityColor(skin.rarity);
     
-    if (result.isDuplicate) {
-      document.getElementById('resultMessage').textContent = 
-        `Duplicate! You received ${result.refundAmount} coins back.`;
-    } else {
-      document.getElementById('resultMessage').textContent = 
-        `New skin unlocked! Check your Skins collection.`;
-    }
+    document.getElementById('resultMessage').textContent = result.isDuplicate
+      ? `Duplicate! You received ${result.refundAmount} coins back.`
+      : `New skin unlocked!`;
     
     renderShop();
     updateMenuUI();
@@ -646,172 +530,182 @@ function renderInventory() {
 }
 
 // =====================
-// SKINS
+// SKINS - ИСПРАВЛЕННАЯ ВЕРСИЯ
 // =====================
 
 async function renderSkins() {
+  console.log('=== renderSkins started ===');
+  
   const container = document.getElementById('skinsGrid');
+  if (!container) {
+    console.error('skinsGrid container not found!');
+    return;
+  }
+  
+  const walletAddress = WalletApp.getUserId();
+  console.log('Wallet:', walletAddress);
+  console.log('PlayerData:', playerData);
   
   document.getElementById('skinsCoins').textContent = playerData?.coins || 0;
   
-  const ownedSkins = playerData?.ownedSkins || ['knight', 'dragon'];
+  // Получаем owned skins - ВАЖНО: проверяем разные варианты
+  let ownedSkins = ['knight', 'dragon']; // default starters
+  
+  if (playerData) {
+    if (playerData.ownedSkins && Array.isArray(playerData.ownedSkins)) {
+      ownedSkins = playerData.ownedSkins;
+    } else if (playerData.owned_skins && Array.isArray(playerData.owned_skins)) {
+      ownedSkins = playerData.owned_skins;
+    }
+  }
+  
+  console.log('Owned skins:', ownedSkins);
+  
   const equippedSkinId = playerData?.equipped_skin || 'knight';
+  console.log('Equipped skin:', equippedSkinId);
   
   const equippedSkin = ALL_SKINS.find(s => s.id === equippedSkinId) || ALL_SKINS[0];
   document.getElementById('equippedSkinName').textContent = equippedSkin.name;
   updateSkinPreview(equippedSkin.colors);
   
+  // Очищаем контейнер
   container.innerHTML = '';
   
-  ALL_SKINS.forEach(skin => {
+  ALL_SKINS.forEach((skin, index) => {
     const owned = ownedSkins.includes(skin.id);
     const equipped = equippedSkinId === skin.id;
     
+    console.log(`Skin ${skin.id}: owned=${owned}, equipped=${equipped}`);
+    
     const div = document.createElement('div');
+    div.className = 'skin-item';
+    if (equipped) div.classList.add('equipped');
+    if (!owned) div.classList.add('locked');
+    
+    let statusText = equipped ? '✓ Equipped' : (owned ? 'Equip' : '📦 Case');
     let statusClass = equipped ? 'equipped' : (owned ? 'owned' : 'locked');
-    div.className = `skin-item ${statusClass}`;
-    
-    let statusText = '';
-    let statusTextClass = '';
-    
-    if (equipped) {
-      statusText = '✓ Equipped';
-      statusTextClass = 'equipped';
-    } else if (owned) {
-      statusText = 'Equip';
-      statusTextClass = 'owned';
-    } else {
-      statusText = '📦 Case Only';
-      statusTextClass = 'locked';
-    }
-    
-    const rarityColor = getRarityColor(skin.rarity);
     
     div.innerHTML = `
       <div class="skin-icon" style="background: linear-gradient(135deg, ${skin.colors[0]} 0%, ${skin.colors[1]} 100%)">
         ${owned ? skin.icon : '🔒'}
       </div>
       <h3>${skin.name}</h3>
-      <p class="skin-rarity" style="color: ${rarityColor}">${skin.rarity}</p>
-      <span class="skin-status ${statusTextClass}">${statusText}</span>
+      <p class="skin-rarity" style="color: ${getRarityColor(skin.rarity)}">${skin.rarity}</p>
+      <span class="skin-status ${statusClass}">${statusText}</span>
     `;
     
-    div.addEventListener('click', () => handleSkinClick(skin, owned, equipped));
+    // Добавляем data-атрибуты для отладки
+    div.dataset.skinId = skin.id;
+    div.dataset.owned = owned;
+    div.dataset.equipped = equipped;
+    
+    // Обработчик клика - используем замыкание правильно
+    const skinData = skin;
+    const isOwned = owned;
+    const isEquipped = equipped;
+    
+    div.addEventListener('click', function(e) {
+      console.log('>>> CLICK on skin:', skinData.id);
+      console.log('    owned:', isOwned, 'equipped:', isEquipped);
+      
+      e.preventDefault();
+      e.stopPropagation();
+      
+      if (typeof WalletApp !== 'undefined' && WalletApp.hapticImpact) {
+        WalletApp.hapticImpact('light');
+      }
+      
+      handleSkinClick(skinData, isOwned, isEquipped);
+    });
+    
     container.appendChild(div);
   });
+  
+  console.log('=== renderSkins finished, added', ALL_SKINS.length, 'skins ===');
 }
 
 async function handleSkinClick(skin, owned, equipped) {
+  console.log('=== handleSkinClick ===');
+  console.log('Skin:', skin.id, skin.name);
+  console.log('Owned:', owned);
+  console.log('Equipped:', equipped);
+  
   if (equipped) {
+    console.log('Already equipped!');
+    showToast('This skin is already equipped!', 'info');
     return;
   }
   
-  if (owned) {
-    const result = await SupabaseClient.equipSkin(WalletManager.address, skin.id);
-    if (result.success) {
+  if (!owned) {
+    console.log('Not owned - show info');
+    showToast('Get this skin from Mystery Case! 📦', 'info');
+    return;
+  }
+  
+  // Owned but not equipped - equip it
+  console.log('Attempting to equip...');
+  
+  const walletAddress = WalletApp.getUserId();
+  if (!walletAddress) {
+    console.error('No wallet address!');
+    showToast('Wallet not connected!', 'error');
+    return;
+  }
+  
+  try {
+    console.log('Calling SupabaseClient.equipSkin...');
+    const result = await SupabaseClient.equipSkin(walletAddress, skin.id);
+    console.log('Equip result:', result);
+    
+    if (result && result.success) {
       playerData = result.player;
-      showToast(`${skin.name} equipped!`, 'success');
+      showToast(`${skin.name} equipped! ✨`, 'success');
       await renderSkins();
+    } else {
+      const errorMsg = result?.error || 'Failed to equip skin';
+      console.error('Equip failed:', errorMsg);
+      showToast(errorMsg, 'error');
     }
-  } else {
-    showToast('Skins can only be obtained from Mystery Case in the Shop!', 'info');
+  } catch (error) {
+    console.error('Equip error:', error);
+    showToast('Error equipping skin: ' + error.message, 'error');
   }
 }
 
 function updateSkinPreview(colors) {
-  const segments = document.querySelectorAll('.preview-segment');
+  const segments = document.querySelectorAll('.preview-snake .snake-segment');
   segments.forEach(seg => {
     seg.style.background = `linear-gradient(135deg, ${colors[0]} 0%, ${colors[1]} 100%)`;
   });
 }
 
 // =====================
-// SCORE SUBMISSION
+// GAME OVER HANDLING
 // =====================
 
-async function showScoreSubmitModal(finalScore, coinsEarned) {
-  pendingGameScore = finalScore;
-  pendingCoinsEarned = coinsEarned;
+async function handleGameOver(finalScore, coinsEarned) {
+  WalletApp.hapticImpact('heavy');
   
+  const walletAddress = WalletApp.getUserId();
+  const isNewRecord = finalScore > (playerData?.high_score || 0);
+  
+  // Save game results
+  await SupabaseClient.endGameSession(finalScore, coinsEarned, walletAddress);
+  playerData = await SupabaseClient.getPlayer(walletAddress);
+  
+  // Show game over modal
   document.getElementById('finalScore').textContent = finalScore;
   document.getElementById('coinsEarned').textContent = coinsEarned;
-  document.getElementById('submitError').textContent = '';
+  document.getElementById('newRecordBadge').style.display = isNewRecord ? 'inline-block' : 'none';
   
-  showModal('scoreModal');
+  showModal('gameOverModal');
+  await updateMenuUI();
 }
 
-async function handleScoreSubmit() {
-  const submitBtn = document.getElementById('submitScoreBtn');
-  const errorEl = document.getElementById('submitError');
-  
-  errorEl.textContent = '';
-  submitBtn.disabled = true;
-  submitBtn.innerHTML = '<span class="btn-icon">⏳</span> Signing...';
-  
-  try {
-    const message = `I verify my Snake in the Castle score:
-
-Network: Base
-Score: ${pendingGameScore}
-Session: ${currentGameSession?.sessionToken || 'N/A'}
-Wallet: ${WalletManager.address}
-Timestamp: ${Date.now()}
-
-This signature confirms that I earned this score legitimately.`;
-
-    const signature = await window.ethereum.request({
-      method: 'personal_sign',
-      params: [message, WalletManager.address]
-    });
-    
-    // End game session with signature
-    const result = await SupabaseClient.endGameSession(
-      currentGameSession?.sessionToken,
-      pendingGameScore,
-      signature,
-      WalletManager.address
-    );
-    
-    if (result.success) {
-      playerData = await SupabaseClient.getPlayer(WalletManager.address);
-      showToast('Score submitted to leaderboard! 🏆', 'success');
-      hideModal('scoreModal');
-      await updateMenuUI();
-    } else {
-      errorEl.textContent = result.error || 'Failed to submit score';
-    }
-    
-  } catch (error) {
-    console.error('Score submission error:', error);
-    if (error.code === 4001) {
-      errorEl.textContent = 'Signature rejected. Your score was not submitted.';
-    } else {
-      errorEl.textContent = error.message;
-    }
-  }
-  
-  submitBtn.disabled = false;
-  submitBtn.innerHTML = '<span class="btn-icon">✍️</span> Sign & Submit Score';
-}
-
-async function handleSkipSubmit() {
-  // End game session without signature (no leaderboard entry)
-  if (currentGameSession?.sessionToken) {
-    await SupabaseClient.endGameSession(
-      currentGameSession.sessionToken,
-      pendingGameScore,
-      null,
-      WalletManager.address
-    );
-    playerData = await SupabaseClient.getPlayer(WalletManager.address);
-  }
-  
-  hideModal('scoreModal');
-  showToast('Score not submitted to leaderboard', 'info');
-}
-
-document.getElementById('submitScoreBtn').addEventListener('click', handleScoreSubmit);
-document.getElementById('skipSubmitBtn').addEventListener('click', handleSkipSubmit);
+document.getElementById('gameOverCloseBtn').addEventListener('click', () => {
+  hideModal('gameOverModal');
+  showScreen('menuScreen');
+});
 
 // =====================
 // GAME LOGIC
@@ -831,8 +725,8 @@ const gameFieldHeight = canvasSize - 2 * castleWallThickness;
 let snake = [];
 let direction = "RIGHT";
 let nextDirection = "RIGHT";
-let speed = 8;
-let baseSpeed = 8;
+let speed = 4;
+let baseSpeed = 4;
 let lastTime = 0;
 let score = 0;
 let highScore = 0;
@@ -848,15 +742,6 @@ let hasShield = false;
 let hasGhost = false;
 
 async function startNewGame() {
-  // Start game session for anti-cheat
-  try {
-    currentGameSession = await SupabaseClient.startGameSession(WalletManager.address);
-    console.log('Game session started:', currentGameSession);
-  } catch (error) {
-    console.warn('Could not start game session:', error);
-    currentGameSession = null;
-  }
-  
   initGame();
   animationId = requestAnimationFrame(gameLoop);
 }
@@ -880,8 +765,9 @@ function initGame() {
   magnetRadius = 0;
   hasShield = false;
   hasGhost = false;
-  baseSpeed = 8;
+  baseSpeed = 4;
   
+  // Apply perks
   if (hasPerk('double_coins')) {
     coinMultiplier = 2;
     showToast('Double Coins activated! 💰x2', 'success');
@@ -893,7 +779,7 @@ function initGame() {
   }
   
   if (hasPerk('slow_start')) {
-    baseSpeed = 5;
+    baseSpeed = 3;
     showToast('Slow Start activated! 🐢', 'success');
   }
   
@@ -925,6 +811,7 @@ function initGame() {
   food = spawnFood();
 }
 
+// Keyboard controls
 document.addEventListener("keydown", (event) => {
   if (gameOver) return;
   
@@ -936,10 +823,12 @@ document.addEventListener("keydown", (event) => {
   if ((key === "ArrowRight" || key === "d" || key === "D") && direction !== "LEFT") nextDirection = "RIGHT";
 });
 
+// Mobile controls
 document.querySelectorAll('.control-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     if (gameOver) return;
     
+    WalletApp.hapticImpact('light');
     const dir = btn.dataset.dir;
     if (dir === "UP" && direction !== "DOWN") nextDirection = "UP";
     if (dir === "DOWN" && direction !== "UP") nextDirection = "DOWN";
@@ -948,15 +837,6 @@ document.querySelectorAll('.control-btn').forEach(btn => {
   });
 });
 
-document.getElementById('restartBtn').addEventListener('click', async () => {
-  selectedPerks = [];
-  activePerks = {};
-  if (WalletManager.address) {
-    playerData = await SupabaseClient.getPlayer(WalletManager.address);
-  }
-  await startNewGame();
-  renderActivePerksBar();
-});
 
 function spawnFood() {
   const gridCols = Math.floor(gameFieldWidth / box);
@@ -992,6 +872,7 @@ function applyMagnetEffect() {
   }
 }
 
+// Drawing functions
 function drawCastle() {
   const gradient = ctx.createLinearGradient(0, 0, canvasSize, canvasSize);
   gradient.addColorStop(0, '#5d4e37');
@@ -1307,7 +1188,6 @@ function updateSnake() {
       usePerk('shield');
       hasShield = false;
       showToast('Shield used! 🛡️', 'info');
-      head = { x: snake[0].x, y: snake[0].y, dir: direction };
       return;
     }
     
@@ -1315,7 +1195,6 @@ function updateSnake() {
       lives--;
       usePerk('extra_life');
       showToast(`Life lost! ${lives} remaining ❤️`, 'error');
-      head = { x: snake[0].x, y: snake[0].y, dir: direction };
       return;
     }
     
@@ -1334,7 +1213,6 @@ function updateSnake() {
         lives--;
         usePerk('extra_life');
         showToast(`Life lost! ${lives} remaining ❤️`, 'error');
-        head = { x: snake[0].x, y: snake[0].y, dir: direction };
         return;
       }
       
@@ -1347,11 +1225,12 @@ function updateSnake() {
   applyMagnetEffect();
 
   if (head.x === food.x && head.y === food.y) {
+    WalletApp.hapticImpact('light');
     snake.unshift(head);
     food = spawnFood();
     score++;
     
-    const coinsGained = 10 * coinMultiplier;
+    const coinsGained = 5 * coinMultiplier;
     coinsEarnedThisGame += coinsGained;
     document.getElementById('score').textContent = score;
     
@@ -1360,8 +1239,8 @@ function updateSnake() {
       document.getElementById('highScore').textContent = highScore;
     }
     
-    if (score % 5 === 0 && speed < 15) {
-      speed += 0.5;
+    if (score % 10 === 0 && speed < 8) {
+      speed += 0.2;
     }
   } else {
     snake.pop();
@@ -1378,30 +1257,7 @@ function collision(head, array) {
 
 function onGameOver() {
   drawGameOverCanvas();
-  
-  const isNewHighScore = score > (playerData?.high_score || 0);
-  
-  setTimeout(() => {
-    if (isNewHighScore && score > 0) {
-      showScoreSubmitModal(score, coinsEarnedThisGame);
-    } else {
-      // End session without leaderboard
-      if (currentGameSession?.sessionToken) {
-        SupabaseClient.endGameSession(
-          currentGameSession.sessionToken,
-          score,
-          null,
-          WalletManager.address
-        ).then(() => {
-          SupabaseClient.getPlayer(WalletManager.address).then(p => {
-            playerData = p;
-            updateMenuUI();
-          });
-        });
-      }
-      showToast(`Game Over! Score: ${score}, Coins: +${coinsEarnedThisGame}`, 'info');
-    }
-  }, 500);
+  handleGameOver(score, coinsEarnedThisGame);
 }
 
 function drawGameOverCanvas() {
@@ -1416,12 +1272,6 @@ function drawGameOverCanvas() {
   ctx.fillStyle = '#ffd700';
   ctx.font = 'bold 32px Arial';
   ctx.fillText(`Score: ${score}`, canvasSize/2, canvasSize/2 + 30);
-  
-  if (coinMultiplier > 1) {
-    ctx.fillStyle = '#4ade80';
-    ctx.font = '24px Arial';
-    ctx.fillText(`Coins: +${coinsEarnedThisGame} (x${coinMultiplier})`, canvasSize/2, canvasSize/2 + 70);
-  }
 }
 
 function gameLoop(timestamp) {
@@ -1448,42 +1298,47 @@ function gameLoop(timestamp) {
   animationId = requestAnimationFrame(gameLoop);
 }
 
-function drawInitialState() {
-  ctx.clearRect(0, 0, canvasSize, canvasSize);
-  drawCastle();
-  drawGameField();
-  
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-  ctx.fillRect(0, 0, canvasSize, canvasSize);
-  
-  ctx.fillStyle = '#ffd700';
-  ctx.font = 'bold 32px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText('🏰 Snake in the Castle 🏰', canvasSize/2, canvasSize/2);
-  
-  ctx.fillStyle = '#fff';
-  ctx.font = '20px Arial';
-  ctx.fillText('Connect wallet to play', canvasSize/2, canvasSize/2 + 40);
-}
-
 // =====================
 // INITIALIZATION
 // =====================
 
 async function initApp() {
-  console.log('Initializing app...');
-  console.log('Target Network:', WalletManager.getNetworkName());
-  console.log('Supabase URL:', SupabaseClient.url);
+  console.log('🎮 Initializing Snake Game...');
   
-  // Hide loading screen
-  document.getElementById('loadingScreen').classList.add('hidden');
-  
-  // Draw initial game state
-  drawInitialState();
-  
-  // Check for existing wallet session
-  await checkExistingSession();
+  try {
+    // Initialize Wallet
+    const walletReady = await WalletApp.init();
+    
+    if (!walletReady) {
+      return; // Will redirect to hub
+    }
+    
+    const walletAddress = WalletApp.getUserId();
+    console.log('Wallet:', walletAddress);
+    
+    // Update wallet display
+    document.getElementById('walletAddress').textContent = WalletApp.getShortAddress();
+    
+    // Load player data
+    playerData = await SupabaseClient.getPlayer(walletAddress);
+    
+    if (!playerData) {
+      playerData = await SupabaseClient.createPlayer(walletAddress);
+    }
+    
+    // Update UI
+    await updateMenuUI();
+    
+    // Hide loading
+    document.getElementById('loadingScreen').classList.add('hidden');
+    
+    console.log('✅ Game initialized!');
+    
+  } catch (error) {
+    console.error('Init error:', error);
+    document.querySelector('.loading-content h2').textContent = 'Error loading game';
+  }
 }
 
-// Start app when page loads
+// Start
 initApp();
