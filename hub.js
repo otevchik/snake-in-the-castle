@@ -176,52 +176,78 @@ const Hub = {
   },
 
   // ИСПРАВЛЕНО: Загружаем из Supabase
-  async loadStats() {
+   async loadStats() {
     const addr = BaseWallet.address;
     if (!addr) return;
 
-    // В DEV режиме показываем моковые данные
-    if (this.devMode) {
-      document.getElementById('totalCoins').textContent = 9999;
-      document.getElementById('totalGames').textContent = 99;
-      document.getElementById('totalScore').textContent = 999;
-      document.getElementById('snakeHighScore').textContent = 500;
-      document.getElementById('spaceHighScore').textContent = 499;
-      return;
+    // Сначала показываем заглушки или кэш
+    const key = this.devMode ? `dev_stats_${addr}` : `stats_${addr}`;
+    const saved = localStorage.getItem(key);
+    
+    // Показываем локальные данные мгновенно
+    if (saved) {
+      this.renderStats(JSON.parse(saved));
     }
 
+    // Если это DEV режим - выходим (используем только локальные)
+    if (this.devMode) return;
+
+    // Загружаем актуальные данные из БД
     try {
-      // Загружаем статистику Snake
-      const snakeStats = await this.fetchPlayerStats('web3_players', addr);
+      console.log('Fetching stats from Supabase...');
       
-      // Загружаем статистику Space Ship
-      const spaceStats = await this.fetchPlayerStats('space_web3_players', addr);
-
-      // Считаем общую статистику
-      const totalCoins = (snakeStats?.coins || 0) + (spaceStats?.coins || 0);
-      const totalGames = (snakeStats?.games_played || 0) + (spaceStats?.games_played || 0);
-      const snakeHigh = snakeStats?.high_score || 0;
-      const spaceHigh = spaceStats?.high_score || 0;
-      const totalScore = Math.max(snakeHigh, spaceHigh);
-
+      // Параллельные запросы для скорости
+      const [snakePlayer, spacePlayer] = await Promise.all([
+        this.fetchSupabase('web3_players', addr),
+        this.fetchSupabase('space_web3_players', addr)
+      ]);
+      
+      const snakeStats = snakePlayer?.[0] || {};
+      const spaceStats = spacePlayer?.[0] || {};
+      
+      const stats = {
+        totalCoins: (snakeStats.coins || 0) + (spaceStats.coins || 0),
+        totalGames: (snakeStats.games_played || 0) + (spaceStats.games_played || 0),
+        totalScore: Math.max(snakeStats.high_score || 0, spaceStats.high_score || 0), // Или сумма?
+        snakeHighScore: snakeStats.high_score || 0,
+        spaceHighScore: spaceStats.high_score || 0
+      };
+      
       // Обновляем UI
-      document.getElementById('totalCoins').textContent = totalCoins;
-      document.getElementById('totalGames').textContent = totalGames;
-      document.getElementById('totalScore').textContent = totalScore;
-      document.getElementById('snakeHighScore').textContent = snakeHigh;
-      document.getElementById('spaceHighScore').textContent = spaceHigh;
-
-      console.log('📊 Stats loaded:', { totalCoins, totalGames, snakeHigh, spaceHigh });
-
-    } catch (error) {
-      console.error('Error loading stats:', error);
-      // Показываем нули при ошибке
-      document.getElementById('totalCoins').textContent = 0;
-      document.getElementById('totalGames').textContent = 0;
-      document.getElementById('totalScore').textContent = 0;
-      document.getElementById('snakeHighScore').textContent = 0;
-      document.getElementById('spaceHighScore').textContent = 0;
+      this.renderStats(stats);
+      
+      // Сохраняем в кэш
+      localStorage.setItem(key, JSON.stringify(stats));
+      
+    } catch (e) {
+      console.error('Error loading stats:', e);
     }
+  },
+  
+  // Вспомогательная функция для рендера
+  renderStats(stats) {
+    document.getElementById('totalCoins').textContent = stats.totalCoins || 0;
+    document.getElementById('totalGames').textContent = stats.totalGames || 0;
+    document.getElementById('totalScore').textContent = stats.totalScore || 0;
+    document.getElementById('snakeHighScore').textContent = stats.snakeHighScore || 0;
+    document.getElementById('spaceHighScore').textContent = stats.spaceHighScore || 0;
+  },
+  
+  // Простой fetch для Supabase (без полной библиотеки)
+  async fetchSupabase(table, address) {
+    const SUPABASE_URL = 'https://hiicndghblbsrgbmtufd.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpaWNuZGdoYmxic3JnYm10dWZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4OTQ5NzIsImV4cCI6MjA4NDQ3MDk3Mn0.cX6CU4bl3jHbFRw75I0LyMpPMEK2GzYoDcmeQa05kMI';
+    
+    const url = `${SUPABASE_URL}/rest/v1/${table}?wallet_address=eq.${address.toLowerCase()}&select=*`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`
+      }
+    });
+    
+    return response.json();
   },
 
   // Запрос к Supabase

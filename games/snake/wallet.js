@@ -1,4 +1,4 @@
-// wallet.js - Wallet adapter for Snake game
+// snake/wallet.js - Wallet adapter for Snake game
 
 const WalletApp = {
   address: null,
@@ -9,20 +9,20 @@ const WalletApp = {
     this.devMode = this.checkDevMode();
     
     console.log('🔧 WalletApp.init()');
-    console.log('   hostname:', window.location.hostname);
     console.log('   devMode:', this.devMode);
     
     const savedAddress = localStorage.getItem('wallet_address');
     const savedProvider = localStorage.getItem('wallet_provider');
-    
-    console.log('   savedAddress:', savedAddress);
-    console.log('   savedProvider:', savedProvider);
     
     if (savedAddress) {
       this.address = savedAddress;
       this.profile = {
         name: savedProvider === 'dev' ? '🔧 Dev Tester' : this.shortenAddress(savedAddress)
       };
+      
+      if (this.devMode) {
+        this.showDevBadge();
+      }
       return true;
     }
     
@@ -34,20 +34,17 @@ const WalletApp = {
     const urlParams = new URLSearchParams(window.location.search);
     const hostname = window.location.hostname;
     
-    // ИСПРАВЛЕНО: только localhost и 127.0.0.1, БЕЗ пустой строки!
+    // Только localhost и 127.0.0.1 считаются dev
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
     
     // Явный параметр ?dev=true
     const hasDevParam = urlParams.get('dev') === 'true';
     
-    // Dev provider на localhost
+    // Provider = 'dev'
     const isDevProvider = localStorage.getItem('wallet_provider') === 'dev';
     
-    const result = hasDevParam || (isLocalhost && isDevProvider);
-    
-    console.log('🔍 checkDevMode:', { hostname, isLocalhost, hasDevParam, isDevProvider, result });
-    
-    return result;
+    // Результат: dev параметр ИЛИ (localhost И dev provider)
+    return hasDevParam || (isLocalhost && isDevProvider);
   },
   
   getUserId() {
