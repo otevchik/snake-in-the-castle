@@ -177,52 +177,68 @@ const Hub = {
 
   // ИСПРАВЛЕНО: Загружаем из Supabase
    async loadStats() {
-    const addr = BaseWallet.address;
-    if (!addr) return;
+  const addr = BaseWallet.address;
+  if (!addr) {
+    console.log('No address, skipping stats');
+    return;
+  }
 
-    // Сначала показываем заглушки или кэш
-    const key = this.devMode ? `dev_stats_${addr}` : `stats_${addr}`;
-    const saved = localStorage.getItem(key);
+  console.log('Loading stats for:', addr);
+  console.log('DevMode:', this.devMode);
+
+  // Если DEV режим - показываем тестовые данные
+  if (this.devMode) {
+    console.log('DEV mode - using mock stats');
+    this.renderStats({
+      totalCoins: 1000,
+      totalGames: 5,
+      totalScore: 500,
+      snakeHighScore: 300,
+      spaceHighScore: 200
+    });
+    return;
+  }
+
+  // Загружаем из Supabase
+  try {
+    console.log('Fetching from Supabase...');
     
-    // Показываем локальные данные мгновенно
-    if (saved) {
-      this.renderStats(JSON.parse(saved));
-    }
-
-    // Если это DEV режим - выходим (используем только локальные)
-    if (this.devMode) return;
-
-    // Загружаем актуальные данные из БД
-    try {
-      console.log('Fetching stats from Supabase...');
-      
-      // Параллельные запросы для скорости
-      const [snakePlayer, spacePlayer] = await Promise.all([
-        this.fetchSupabase('web3_players', addr),
-        this.fetchSupabase('space_web3_players', addr)
-      ]);
-      
-      const snakeStats = snakePlayer?.[0] || {};
-      const spaceStats = spacePlayer?.[0] || {};
-      
-      const stats = {
-        totalCoins: (snakeStats.coins || 0) + (spaceStats.coins || 0),
-        totalGames: (snakeStats.games_played || 0) + (spaceStats.games_played || 0),
-        totalScore: Math.max(snakeStats.high_score || 0, spaceStats.high_score || 0), // Или сумма?
-        snakeHighScore: snakeStats.high_score || 0,
-        spaceHighScore: spaceStats.high_score || 0
-      };
-      
-      // Обновляем UI
-      this.renderStats(stats);
-      
-      // Сохраняем в кэш
-      localStorage.setItem(key, JSON.stringify(stats));
-      
-    } catch (e) {
-      console.error('Error loading stats:', e);
-    }
-  },
+    const [snakeData, spaceData] = await Promise.all([
+      this.fetchSupabase('web3_players', addr),
+      this.fetchSupabase('space_web3_players', addr)
+    ]);
+    
+    console.log('Snake data:', snakeData);
+    console.log('Space data:', spaceData);
+    
+    const snake = Array.isArray(snakeData) && snakeData[0] ? snakeData[0] : {};
+    const space = Array.isArray(spaceData) && spaceData[0] ? spaceData[0] : {};
+    
+    console.log('Snake parsed:', snake);
+    console.log('Space parsed:', space);
+    
+    const stats = {
+      totalCoins: (snake.coins || 0) + (space.coins || 0),
+      totalGames: (snake.games_played || 0) + (space.games_played || 0),
+      totalScore: Math.max(snake.high_score || 0, space.high_score || 0),
+      snakeHighScore: snake.high_score || 0,
+      spaceHighScore: space.high_score || 0
+    };
+    
+    console.log('Final stats:', stats);
+    
+    this.renderStats(stats);
+    
+    // Кэшируем
+    const key = `stats_${addr}`;
+    localStorage.setItem(key, JSON.stringify(stats));
+    
+    console.log('Stats rendered!');
+    
+  } catch (e) {
+    console.error('Error loading stats:', e);
+  }
+},
   
   // Вспомогательная функция для рендера
   renderStats(stats) {
