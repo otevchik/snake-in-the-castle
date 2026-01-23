@@ -89,6 +89,14 @@ let currentShipColors = ['#00d4ff', '#7b2cbf'];
 let keys = { left: false, right: false };
 
 // =====================
+// HELPER: Check DEV mode
+// =====================
+
+function isDevMode() {
+  return WalletApp && WalletApp.devMode === true;
+}
+
+// =====================
 // PERKS SYSTEM
 // =====================
 
@@ -179,6 +187,12 @@ function updateSelectedPerksList() {
 }
 
 async function consumeSelectedPerks() {
+  // В DEV режиме не расходуем предметы
+  if (isDevMode()) {
+    console.log('🔧 DEV MODE: Skipping perk consumption');
+    return;
+  }
+  
   for (const perkId of selectedPerks) {
     await SupabaseSpace.consumeItem(WalletApp.getUserId(), perkId);
   }
@@ -443,6 +457,14 @@ async function renderShop() {
   container.querySelectorAll('.buy-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       WalletApp.hapticImpact('medium');
+      
+      // В DEV режиме блокируем покупки
+      if (isDevMode()) {
+        showToast('🔧 DEV: Purchase blocked', 'info');
+        console.log('🔧 DEV MODE: Would buy item:', btn.dataset.item);
+        return;
+      }
+      
       const result = await SupabaseSpace.buyItem(WalletApp.getUserId(), btn.dataset.item, parseInt(btn.dataset.price));
       if (result.success) {
         playerData = result.player;
@@ -457,6 +479,13 @@ async function renderShop() {
 }
 
 async function openMysteryCrate() {
+  // В DEV режиме блокируем открытие кейсов
+  if (isDevMode()) {
+    showToast('🔧 DEV: Crate opening blocked', 'info');
+    console.log('🔧 DEV MODE: Would open crate');
+    return;
+  }
+  
   const result = await SupabaseSpace.openCrate(WalletApp.getUserId(), MYSTERY_CRATE.price, ALL_SHIPS);
   
   if (!result.success) {
@@ -576,6 +605,16 @@ async function renderSkins() {
 }
 
 async function equipShip(shipItem) {
+  // В DEV режиме блокируем смену скина в БД
+  if (isDevMode()) {
+    showToast('🔧 DEV: Ship equipped (not saved)', 'info');
+    console.log('🔧 DEV MODE: Would equip ship:', shipItem.id);
+    // Но можно обновить локально для тестирования
+    currentShipIcon = shipItem.icon;
+    currentShipColors = shipItem.colors;
+    return;
+  }
+  
   const result = await SupabaseSpace.equipShip(WalletApp.getUserId(), shipItem.id);
   if (result.success) {
     playerData = result.player;
@@ -609,10 +648,16 @@ function stopGame() {
 }
 
 async function startNewGame() {
-  try {
-    currentGameSession = await SupabaseSpace.startGameSession(WalletApp.getUserId());
-  } catch (e) {
-    currentGameSession = null;
+  // В DEV режиме не создаём сессию в БД
+  if (isDevMode()) {
+    console.log('🔧 DEV MODE: Skipping game session creation');
+    currentGameSession = { sessionToken: 'dev-session-' + Date.now() };
+  } else {
+    try {
+      currentGameSession = await SupabaseSpace.startGameSession(WalletApp.getUserId());
+    } catch (e) {
+      currentGameSession = null;
+    }
   }
   
   initGame();
@@ -1028,6 +1073,10 @@ function draw() {
   ctx.restore();
 }
 
+// =====================
+// GAME OVER - ИСПРАВЛЕНО
+// =====================
+
 async function gameOver() {
   gameRunning = false;
   
@@ -1035,17 +1084,29 @@ async function gameOver() {
   
   const totalCoins = coinsCollected + Math.floor(score / 10);
   
-  if (currentGameSession?.sessionToken) {
-    await SupabaseSpace.endGameSession(
-      currentGameSession.sessionToken,
-      score,
-      asteroidsDestroyed,
-      coinsCollected,
-      WalletApp.getUserId()
-    );
+  // ========== ПРОВЕРКА DEV РЕЖИМА ==========
+  if (isDevMode()) {
+    console.log('🔧 DEV MODE: Game results NOT saved to database');
+    console.log('   Score:', score);
+    console.log('   Asteroids destroyed:', asteroidsDestroyed);
+    console.log('   Coins collected:', coinsCollected);
+    console.log('   Total coins earned:', totalCoins);
+  } else {
+    // Сохраняем результаты ТОЛЬКО в продакшене
+    if (currentGameSession?.sessionToken) {
+      await SupabaseSpace.endGameSession(
+        currentGameSession.sessionToken,
+        score,
+        asteroidsDestroyed,
+        coinsCollected,
+        WalletApp.getUserId()
+      );
+    }
+    
+    // Обновляем данные игрока из БД
+    playerData = await SupabaseSpace.getPlayer(WalletApp.getUserId());
   }
-  
-  playerData = await SupabaseSpace.getPlayer(WalletApp.getUserId());
+  // ==========================================
   
   const isNewRecord = score > (playerData?.high_score || 0);
   
@@ -1054,14 +1115,14 @@ async function gameOver() {
   document.getElementById('coinsEarned').textContent = totalCoins;
   document.getElementById('newRecordBadge').style.display = isNewRecord ? 'inline-block' : 'none';
   
+  // Показываем DEV индикатор в модальном окне
+  if (isDevMode()) {
+    document.getElementById('coinsEarned').textContent = totalCoins + ' (not saved)';
+  }
+  
   showModal('gameOverModal');
   await updateMenuUI();
 }
-
-document.getElementById('gameOverCloseBtn').addEventListener('click', () => {
-  hideModal('gameOverModal');
-  showScreen('menuScreen');
-});
 
 function gameLoop() {
   if (!gameRunning) return;
@@ -1073,11 +1134,43 @@ function gameLoop() {
 }
 
 // =====================
+// BUTTON HANDLERS
+// =====================
+
+function setupModalButtons() {
+  // Game Over кнопка
+  const gameOverBtn = document.getElementById('gameOverCloseBtn');
+  if (gameOverBtn) {
+    gameOverBtn.onclick = function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Continue clicked');
+      hideModal('gameOverModal');
+      showScreen('menuScreen');
+    };
+    console.log('✅ gameOverCloseBtn handler attached');
+  }
+  
+  // Case Modal кнопка
+  const caseCloseBtn = document.getElementById('closeModalBtn');
+  if (caseCloseBtn) {
+    caseCloseBtn.onclick = function(e) {
+      e.preventDefault();
+      hideModal('caseModal');
+    };
+    console.log('✅ closeModalBtn handler attached');
+  }
+}
+
+// =====================
 // INITIALIZATION
 // =====================
 
 async function initApp() {
   console.log('🚀 Initializing Space Ship...');
+  
+  // Сначала настраиваем кнопки
+  setupModalButtons();
   
   try {
     const walletReady = await WalletApp.init();
@@ -1090,6 +1183,7 @@ async function initApp() {
     
     if (WalletApp.devMode) {
       WalletApp.showDevBadge();
+      console.log('🔧 DEV MODE ACTIVE - Database writes are disabled');
     }
     
     const walletAddress = WalletApp.getUserId();
@@ -1097,7 +1191,21 @@ async function initApp() {
     playerData = await SupabaseSpace.getPlayer(walletAddress);
     
     if (!playerData) {
-      playerData = await SupabaseSpace.createPlayer(walletAddress);
+      if (isDevMode()) {
+        console.log('🔧 DEV MODE: Using mock player data');
+        playerData = {
+          wallet_address: walletAddress,
+          coins: 9999,
+          high_score: 0,
+          games_played: 0,
+          total_asteroids: 0,
+          ownedShips: ['fighter', 'shuttle'],
+          equipped_ship: 'fighter',
+          inventory: []
+        };
+      } else {
+        playerData = await SupabaseSpace.createPlayer(walletAddress);
+      }
     }
     
     await updateMenuUI();

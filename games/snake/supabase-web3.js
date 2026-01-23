@@ -122,6 +122,13 @@ const SupabaseClient = {
   // =====================
   
   async endGameSession(finalScore, coinsEarned, walletAddress) {
+    // Если вы хотите полный контроль, добавьте проверку тут:
+    if (WalletApp.devMode === true) {
+        console.log('🔧 DEV MODE: SupabaseClient.endGameSession skipped.');
+        // Если мы здесь, значит в game.js мы уже обновили playerData, но нужно вернуть структуру, которую ждёт game.js
+        return { success: true, coinsEarned, isNewRecord: finalScore > (playerData?.high_score || 0) };
+    }
+
     try {
       const address = walletAddress.toLowerCase();
       const player = await this.getPlayer(address);

@@ -58,6 +58,11 @@ let selectedPerks = [];
 let activePerks = {};
 const MAX_PERKS = 3;
 
+function isDevMode() {
+  // Проверяем, доступен ли WalletApp и его devMode
+  return WalletApp && WalletApp.devMode === true;
+}
+
 function renderPerksSelection() {
   const container = document.getElementById('perksGrid');
   container.innerHTML = '';
@@ -684,28 +689,39 @@ function updateSkinPreview(colors) {
 // =====================
 
 async function handleGameOver(finalScore, coinsEarned) {
-  WalletApp.hapticImpact('heavy');
+  console.log('=== GAME OVER ===');
+  console.log('Score:', finalScore, 'Coins:', coinsEarned);
+  
+  try {
+    WalletApp.hapticImpact('heavy');
+  } catch(e) {}
   
   const walletAddress = WalletApp.getUserId();
-  const isNewRecord = finalScore > (playerData?.high_score || 0);
+  const currentHighScore = playerData?.high_score || 0;
+  const isNewRecord = finalScore > currentHighScore;
   
-  // Save game results
-  await SupabaseClient.endGameSession(finalScore, coinsEarned, walletAddress);
-  playerData = await SupabaseClient.getPlayer(walletAddress);
-  
-  // Show game over modal
+  // Сначала показываем модальное окно (чтобы не зависало)
   document.getElementById('finalScore').textContent = finalScore;
   document.getElementById('coinsEarned').textContent = coinsEarned;
   document.getElementById('newRecordBadge').style.display = isNewRecord ? 'inline-block' : 'none';
-  
   showModal('gameOverModal');
+  
+  // Потом сохраняем в БД (асинхронно)
+  if (walletAddress && !WalletApp.devMode) {
+    try {
+      console.log('Saving to database...');
+      await SupabaseClient.endGameSession(finalScore, coinsEarned, walletAddress);
+      playerData = await SupabaseClient.getPlayer(walletAddress);
+      console.log('Saved successfully');
+    } catch (error) {
+      console.error('Save error:', error);
+    }
+  } else {
+    console.log('Skipping save - devMode:', WalletApp.devMode);
+  }
+  
   await updateMenuUI();
 }
-
-document.getElementById('gameOverCloseBtn').addEventListener('click', () => {
-  hideModal('gameOverModal');
-  showScreen('menuScreen');
-});
 
 // =====================
 // GAME LOGIC
@@ -1297,6 +1313,46 @@ function gameLoop(timestamp) {
   
   animationId = requestAnimationFrame(gameLoop);
 }
+// =====================
+// BUTTON HANDLERS
+// =====================
+
+function closeGameOver() {
+  console.log('closeGameOver called');
+  hideModal('gameOverModal');
+  showScreen('menuScreen');
+}
+
+// Глобальная функция для onclick
+window.closeGameOver = closeGameOver;
+
+// Обработчики кнопок модальных окон
+function setupModalButtons() {
+  // Game Over кнопка
+  const gameOverBtn = document.getElementById('gameOverCloseBtn');
+  if (gameOverBtn) {
+    gameOverBtn.onclick = function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Continue clicked');
+      hideModal('gameOverModal');
+      showScreen('menuScreen');
+    };
+    console.log('✅ gameOverCloseBtn handler attached');
+  } else {
+    console.error('❌ gameOverCloseBtn not found!');
+  }
+  
+  // Case Modal кнопка
+  const caseCloseBtn = document.getElementById('closeModalBtn');
+  if (caseCloseBtn) {
+    caseCloseBtn.onclick = function(e) {
+      e.preventDefault();
+      hideModal('caseModal');
+    };
+    console.log('✅ closeModalBtn handler attached');
+  }
+}
 
 // =====================
 // INITIALIZATION
@@ -1304,6 +1360,9 @@ function gameLoop(timestamp) {
 
 async function initApp() {
   console.log('🎮 Initializing Snake Game...');
+  
+  // ВАЖНО: Сначала настраиваем кнопки модальных окон
+  setupModalButtons();
   
   try {
     // Initialize Wallet
