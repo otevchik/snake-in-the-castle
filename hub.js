@@ -1,34 +1,33 @@
 // hub.js - Fast loading hub
 
+const SUPABASE_URL = 'https://hiicndghblbsrgbmtufd.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpaWNuZGdoYmxic3JnYm10dWZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4OTQ5NzIsImV4cCI6MjA4NDQ3MDk3Mn0.cX6CU4bl3jHbFRw75I0LyMpPMEK2GzYoDcmeQa05kMI';
+
 const Hub = {
   devMode: false,
 
-  // Initialize - show UI immediately
   init() {
     console.log('🎮 Hub init');
 
     this.devMode = this.checkDevMode();
-
-    // 1. Hide loading instantly
     this.hideLoading();
-
-    // 2. Show connect screen immediately
     this.showConnect();
-
-    // 3. Setup events
     this.setupEvents();
-
-    // 4. Try auto-reconnect in background (non-blocking)
     this.tryAutoReconnect();
 
-    // 5. Show dev badge if needed
     if (this.devMode) this.showDevBadge();
   },
 
   checkDevMode() {
     const urlParams = new URLSearchParams(window.location.search);
-    const isLocalhost = ['localhost', '127.0.0.1', ''].includes(window.location.hostname);
-    return urlParams.get('dev') === 'true' || localStorage.getItem('devMode') === 'true' || isLocalhost;
+    const hostname = window.location.hostname;
+    
+    // ИСПРАВЛЕНО: без пустой строки
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+    const hasDevParam = urlParams.get('dev') === 'true';
+    const isDevProvider = localStorage.getItem('wallet_provider') === 'dev';
+    
+    return hasDevParam || (isLocalhost && isDevProvider);
   },
 
   hideLoading() {
@@ -36,7 +35,6 @@ const Hub = {
     if (el) el.style.display = 'none';
   },
 
-  // Try reconnect with timeout (non-blocking)
   async tryAutoReconnect() {
     try {
       const connected = await Promise.race([
@@ -53,26 +51,20 @@ const Hub = {
   },
 
   setupEvents() {
-    // Connect buttons
     document.getElementById('connectBase')?.addEventListener('click', () => this.connect());
     document.getElementById('connectCoinbase')?.addEventListener('click', () => this.connect());
     document.getElementById('connectOther')?.addEventListener('click', () => this.connect());
     document.getElementById('connectDev')?.addEventListener('click', () => this.connectDev());
-
-    // Disconnect
     document.getElementById('disconnectBtn')?.addEventListener('click', () => this.disconnect());
 
-    // Games
     document.querySelectorAll('.game-card:not(.coming-soon)').forEach(card => {
       card.addEventListener('click', () => this.openGame(card.dataset.game));
     });
 
-    // Wallet events
     window.addEventListener('walletDisconnected', () => this.showConnect());
     window.addEventListener('walletChanged', () => this.updateUI());
     window.addEventListener('chainChanged', () => this.updateUI());
 
-    // Dev toggle: Ctrl+Shift+D
     document.addEventListener('keydown', (e) => {
       if (e.ctrlKey && e.shiftKey && e.key === 'D') {
         e.preventDefault();
@@ -81,7 +73,6 @@ const Hub = {
     });
   },
 
-  // Connect real wallet
   async connect() {
     if (typeof window.ethereum === 'undefined') {
       this.toast('❌ No wallet found. Use Dev Wallet.');
@@ -104,7 +95,6 @@ const Hub = {
     }
   },
 
-  // Connect dev wallet
   connectDev() {
     this.setLoading('connectDev', true);
 
@@ -165,7 +155,6 @@ const Hub = {
     const addr = BaseWallet.address;
     const profile = BaseWallet.profile;
 
-    // Profile
     const nameEl = document.getElementById('profileName');
     const addrEl = document.getElementById('profileAddress');
     const avatarEl = document.getElementById('avatarFallback');
@@ -174,7 +163,6 @@ const Hub = {
     if (addrEl) addrEl.textContent = BaseWallet.shortenAddress(addr);
     if (avatarEl) avatarEl.textContent = this.devMode ? '🔧' : '👤';
 
-    // Network
     const netEl = document.getElementById('networkName');
     const dotEl = document.querySelector('.network-dot');
 
@@ -187,49 +175,100 @@ const Hub = {
     if (netEl) netEl.style.color = color;
   },
 
-  loadStats() {
+  // ИСПРАВЛЕНО: Загружаем из Supabase
+  async loadStats() {
     const addr = BaseWallet.address;
     if (!addr) return;
 
-    // Load from localStorage only (fast)
-    const key = this.devMode ? `dev_stats_${addr}` : `stats_${addr}`;
-    const saved = localStorage.getItem(key);
+    // В DEV режиме показываем моковые данные
+    if (this.devMode) {
+      document.getElementById('totalCoins').textContent = 9999;
+      document.getElementById('totalGames').textContent = 99;
+      document.getElementById('totalScore').textContent = 999;
+      document.getElementById('snakeHighScore').textContent = 500;
+      document.getElementById('spaceHighScore').textContent = 499;
+      return;
+    }
 
-    const stats = saved ? JSON.parse(saved) : {
-      totalCoins: this.devMode ? 1000 : 0,
-      totalGames: this.devMode ? 5 : 0,
-      totalScore: this.devMode ? 500 : 0,
-      snakeHighScore: this.devMode ? 300 : 0,
-      spaceHighScore: this.devMode ? 200 : 0
-    };
+    try {
+      // Загружаем статистику Snake
+      const snakeStats = await this.fetchPlayerStats('web3_players', addr);
+      
+      // Загружаем статистику Space Ship
+      const spaceStats = await this.fetchPlayerStats('space_web3_players', addr);
 
-    document.getElementById('totalCoins').textContent = stats.totalCoins || 0;
-    document.getElementById('totalGames').textContent = stats.totalGames || 0;
-    document.getElementById('totalScore').textContent = stats.totalScore || 0;
-    document.getElementById('snakeHighScore').textContent = stats.snakeHighScore || 0;
-    document.getElementById('spaceHighScore').textContent = stats.spaceHighScore || 0;
+      // Считаем общую статистику
+      const totalCoins = (snakeStats?.coins || 0) + (spaceStats?.coins || 0);
+      const totalGames = (snakeStats?.games_played || 0) + (spaceStats?.games_played || 0);
+      const snakeHigh = snakeStats?.high_score || 0;
+      const spaceHigh = spaceStats?.high_score || 0;
+      const totalScore = Math.max(snakeHigh, spaceHigh);
+
+      // Обновляем UI
+      document.getElementById('totalCoins').textContent = totalCoins;
+      document.getElementById('totalGames').textContent = totalGames;
+      document.getElementById('totalScore').textContent = totalScore;
+      document.getElementById('snakeHighScore').textContent = snakeHigh;
+      document.getElementById('spaceHighScore').textContent = spaceHigh;
+
+      console.log('📊 Stats loaded:', { totalCoins, totalGames, snakeHigh, spaceHigh });
+
+    } catch (error) {
+      console.error('Error loading stats:', error);
+      // Показываем нули при ошибке
+      document.getElementById('totalCoins').textContent = 0;
+      document.getElementById('totalGames').textContent = 0;
+      document.getElementById('totalScore').textContent = 0;
+      document.getElementById('snakeHighScore').textContent = 0;
+      document.getElementById('spaceHighScore').textContent = 0;
+    }
   },
 
- openGame(game) {
-  const urls = {
-    'snake': 'games/snake/',
-    'space-ship': 'games/space-ship/'
-  };
+  // Запрос к Supabase
+  async fetchPlayerStats(table, walletAddress) {
+    const address = walletAddress.toLowerCase();
+    
+    try {
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/${table}?wallet_address=eq.${address}&select=coins,high_score,games_played`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+          }
+        }
+      );
 
-  if (!urls[game]) return;
+      if (!response.ok) {
+        console.warn(`Table ${table} error:`, response.status);
+        return null;
+      }
 
-  // базовый путь репозитория (snake-in-the-castle)
-  const basePath = window.location.pathname.replace(/\/[^\/]*$/, '');
+      const data = await response.json();
+      return data && data.length > 0 ? data[0] : null;
+    } catch (error) {
+      console.warn(`Failed to fetch ${table}:`, error);
+      return null;
+    }
+  },
 
-  const url = new URL(`${basePath}/${urls[game]}`, window.location.origin);
+  openGame(game) {
+    const urls = {
+      'snake': 'games/snake/',
+      'space-ship': 'games/space-ship/'
+    };
 
-  if (this.devMode) {
-    url.searchParams.set('dev', 'true');
-  }
+    if (!urls[game]) return;
 
-  window.location.href = url.toString();
-},
+    const basePath = window.location.pathname.replace(/\/[^\/]*$/, '');
+    const url = new URL(`${basePath}/${urls[game]}`, window.location.origin);
 
+    if (this.devMode) {
+      url.searchParams.set('dev', 'true');
+    }
+
+    window.location.href = url.toString();
+  },
 
   toggleDevMode() {
     this.devMode = !this.devMode;
@@ -258,5 +297,4 @@ const Hub = {
   }
 };
 
-// Start immediately
 document.addEventListener('DOMContentLoaded', () => Hub.init());
