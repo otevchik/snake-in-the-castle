@@ -73,6 +73,7 @@ let hasShield = false;
 let hasMagnet = false;
 let rapidFire = false;
 let bigBullets = false;
+let starsCollected = 0;
 
 let ship = { x: 180, y: 520, width: 40, height: 40, speed: 6 };
 let bullets = [];
@@ -187,7 +188,6 @@ function updateSelectedPerksList() {
 }
 
 async function consumeSelectedPerks() {
-  // В DEV режиме не расходуем предметы
   if (isDevMode()) {
     console.log('🔧 DEV MODE: Skipping perk consumption');
     return;
@@ -344,6 +344,10 @@ async function updateMenuUI() {
     document.getElementById('gamesPlayed').textContent = playerData.games_played || 0;
     document.getElementById('asteroidsDestroyed').textContent = playerData.total_asteroids || 0;
     
+    // Stars
+    const starsEl = document.getElementById('playerStars');
+    if (starsEl) starsEl.textContent = playerData.stars || 0;
+    
     const shopCoins = document.getElementById('shopCoins');
     if (shopCoins) shopCoins.textContent = playerData.coins || 0;
   }
@@ -458,7 +462,6 @@ async function renderShop() {
     btn.addEventListener('click', async () => {
       WalletApp.hapticImpact('medium');
       
-      // В DEV режиме блокируем покупки
       if (isDevMode()) {
         showToast('🔧 DEV: Purchase blocked', 'info');
         console.log('🔧 DEV MODE: Would buy item:', btn.dataset.item);
@@ -479,7 +482,6 @@ async function renderShop() {
 }
 
 async function openMysteryCrate() {
-  // В DEV режиме блокируем открытие кейсов
   if (isDevMode()) {
     showToast('🔧 DEV: Crate opening blocked', 'info');
     console.log('🔧 DEV MODE: Would open crate');
@@ -605,11 +607,9 @@ async function renderSkins() {
 }
 
 async function equipShip(shipItem) {
-  // В DEV режиме блокируем смену скина в БД
   if (isDevMode()) {
     showToast('🔧 DEV: Ship equipped (not saved)', 'info');
     console.log('🔧 DEV MODE: Would equip ship:', shipItem.id);
-    // Но можно обновить локально для тестирования
     currentShipIcon = shipItem.icon;
     currentShipColors = shipItem.colors;
     return;
@@ -648,7 +648,6 @@ function stopGame() {
 }
 
 async function startNewGame() {
-  // В DEV режиме не создаём сессию в БД
   if (isDevMode()) {
     console.log('🔧 DEV MODE: Skipping game session creation');
     currentGameSession = { sessionToken: 'dev-session-' + Date.now() };
@@ -671,7 +670,7 @@ function initGame() {
   asteroids = [];
   coins = [];
   particles = [];
-  
+  starsCollected = 0;
   score = 0;
   lives = 3;
   coinsCollected = 0;
@@ -800,13 +799,16 @@ function spawnAsteroid() {
 }
 
 function spawnCoin(x, y) {
+  const isStar = Math.random() < 0.25; // 25% шанс на звезду
+  
   coins.push({
     x: x - 10,
     y: y,
     width: 20,
     height: 20,
     speed: 2,
-    rotation: 0
+    rotation: 0,
+    isStar: isStar
   });
 }
 
@@ -835,7 +837,7 @@ function update() {
   if (keys.left && ship.x > 5) ship.x -= ship.speed;
   if (keys.right && ship.x < CANVAS_WIDTH - ship.width - 5) ship.x += ship.speed;
   
-  // Update stars
+  // Update stars (background)
   stars.forEach(star => {
     star.y += star.speed;
     if (star.y > CANVAS_HEIGHT) {
@@ -930,9 +932,16 @@ function update() {
     }
     
     if (collision(c, ship)) {
-      coinsCollected += coinMultiplier;
-      WalletApp.hapticImpact('light');
-      createParticles(c.x + c.width/2, c.y + c.height/2, '#ffd700', 6);
+      if (c.isStar) {
+        starsCollected++;
+        WalletApp.hapticImpact('heavy');
+        createParticles(c.x + c.width/2, c.y + c.height/2, '#ffd700', 10);
+        showToast('⭐ Star!', 'success');
+      } else {
+        coinsCollected += coinMultiplier;
+        WalletApp.hapticImpact('light');
+        createParticles(c.x + c.width/2, c.y + c.height/2, '#ffd700', 6);
+      }
       updateGameUI();
       return false;
     }
@@ -956,7 +965,7 @@ function draw() {
   ctx.fillStyle = '#0a0a0a';
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
   
-  // Stars
+  // Stars (background)
   stars.forEach(star => {
     ctx.fillStyle = `rgba(255, 255, 255, ${0.3 + Math.random() * 0.4})`;
     ctx.beginPath();
@@ -1010,30 +1019,41 @@ function draw() {
     ctx.restore();
   });
   
-  // Coins
+  // Coins and Stars
   coins.forEach(c => {
     ctx.save();
     ctx.translate(c.x + c.width/2, c.y + c.height/2);
     ctx.rotate(c.rotation);
     
-    ctx.shadowColor = '#ffd700';
-    ctx.shadowBlur = 8;
-    
-    const gradient = ctx.createRadialGradient(-3, -3, 0, 0, 0, c.width/2);
-    gradient.addColorStop(0, '#ffd700');
-    gradient.addColorStop(0.7, '#daa520');
-    gradient.addColorStop(1, '#b8860b');
-    ctx.fillStyle = gradient;
-    
-    ctx.beginPath();
-    ctx.arc(0, 0, c.width/2, 0, Math.PI * 2);
-    ctx.fill();
-    
-    ctx.fillStyle = '#b8860b';
-    ctx.font = 'bold 12px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('$', 0, 1);
+    if (c.isStar) {
+      // Draw star
+      ctx.shadowColor = '#ffd700';
+      ctx.shadowBlur = 15;
+      ctx.font = '20px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('⭐', 0, 0);
+    } else {
+      // Draw coin
+      ctx.shadowColor = '#ffd700';
+      ctx.shadowBlur = 8;
+      
+      const gradient = ctx.createRadialGradient(-3, -3, 0, 0, 0, c.width/2);
+      gradient.addColorStop(0, '#ffd700');
+      gradient.addColorStop(0.7, '#daa520');
+      gradient.addColorStop(1, '#b8860b');
+      ctx.fillStyle = gradient;
+      
+      ctx.beginPath();
+      ctx.arc(0, 0, c.width/2, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.fillStyle = '#b8860b';
+      ctx.font = 'bold 12px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('$', 0, 1);
+    }
     
     ctx.shadowBlur = 0;
     ctx.restore();
@@ -1074,51 +1094,43 @@ function draw() {
 }
 
 // =====================
-// GAME OVER - ИСПРАВЛЕНО
+// GAME OVER
 // =====================
 
 async function gameOver() {
   gameRunning = false;
-  
   WalletApp.hapticImpact('heavy');
   
   const totalCoins = coinsCollected + Math.floor(score / 10);
   
-  // ========== ПРОВЕРКА DEV РЕЖИМА ==========
-  if (isDevMode()) {
-    console.log('🔧 DEV MODE: Game results NOT saved to database');
-    console.log('   Score:', score);
-    console.log('   Asteroids destroyed:', asteroidsDestroyed);
-    console.log('   Coins collected:', coinsCollected);
-    console.log('   Total coins earned:', totalCoins);
-  } else {
-    // Сохраняем результаты ТОЛЬКО в продакшене
+  if (!isDevMode()) {
     if (currentGameSession?.sessionToken) {
       await SupabaseSpace.endGameSession(
         currentGameSession.sessionToken,
         score,
         asteroidsDestroyed,
         coinsCollected,
+        starsCollected,
         WalletApp.getUserId()
       );
     }
-    
-    // Обновляем данные игрока из БД
     playerData = await SupabaseSpace.getPlayer(WalletApp.getUserId());
+  } else {
+    console.log('🔧 DEV MODE: Game results NOT saved to database');
+    console.log('   Score:', score);
+    console.log('   Asteroids destroyed:', asteroidsDestroyed);
+    console.log('   Coins collected:', coinsCollected);
+    console.log('   Stars collected:', starsCollected);
+    console.log('   Total coins earned:', totalCoins);
   }
-  // ==========================================
   
   const isNewRecord = score > (playerData?.high_score || 0);
   
   document.getElementById('finalScore').textContent = score;
   document.getElementById('finalAsteroids').textContent = asteroidsDestroyed;
-  document.getElementById('coinsEarned').textContent = totalCoins;
+  document.getElementById('coinsEarned').textContent = isDevMode() ? totalCoins + ' (not saved)' : totalCoins;
+  document.getElementById('starsEarned').textContent = starsCollected;
   document.getElementById('newRecordBadge').style.display = isNewRecord ? 'inline-block' : 'none';
-  
-  // Показываем DEV индикатор в модальном окне
-  if (isDevMode()) {
-    document.getElementById('coinsEarned').textContent = totalCoins + ' (not saved)';
-  }
   
   showModal('gameOverModal');
   await updateMenuUI();
@@ -1138,7 +1150,6 @@ function gameLoop() {
 // =====================
 
 function setupModalButtons() {
-  // Game Over кнопка
   const gameOverBtn = document.getElementById('gameOverCloseBtn');
   if (gameOverBtn) {
     gameOverBtn.onclick = function(e) {
@@ -1151,7 +1162,6 @@ function setupModalButtons() {
     console.log('✅ gameOverCloseBtn handler attached');
   }
   
-  // Case Modal кнопка
   const caseCloseBtn = document.getElementById('closeModalBtn');
   if (caseCloseBtn) {
     caseCloseBtn.onclick = function(e) {
@@ -1169,7 +1179,6 @@ function setupModalButtons() {
 async function initApp() {
   console.log('🚀 Initializing Space Ship...');
   
-  // Сначала настраиваем кнопки
   setupModalButtons();
   
   try {
@@ -1199,6 +1208,7 @@ async function initApp() {
           high_score: 0,
           games_played: 0,
           total_asteroids: 0,
+          stars: 0,
           ownedShips: ['fighter', 'shuttle'],
           equipped_ship: 'fighter',
           inventory: []

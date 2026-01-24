@@ -50,6 +50,8 @@ let playerData = null;
 let currentLeaderboardPage = 1;
 let currentGameSession = null;
 
+let backgroundCanvas = null;
+let backgroundCtx = null;
 // =====================
 // PERKS SYSTEM
 // =====================
@@ -57,6 +59,121 @@ let currentGameSession = null;
 let selectedPerks = [];
 let activePerks = {};
 const MAX_PERKS = 3;
+
+let star = null;
+let starsEarnedThisGame = 0;
+let starSpawnTimer = 0;
+
+function createBackground() {
+  backgroundCanvas = document.createElement('canvas');
+  backgroundCanvas.width = canvasSize;
+  backgroundCanvas.height = canvasSize;
+  backgroundCtx = backgroundCanvas.getContext('2d');
+  
+  // Рисуем замок на офф-скрин канвас
+  const gradient = backgroundCtx.createLinearGradient(0, 0, canvasSize, canvasSize);
+  gradient.addColorStop(0, '#5d4e37');
+  gradient.addColorStop(0.5, '#8b7355');
+  gradient.addColorStop(1, '#5d4e37');
+  backgroundCtx.fillStyle = gradient;
+  backgroundCtx.fillRect(0, 0, canvasSize, canvasSize);
+
+  backgroundCtx.strokeStyle = '#3d3426';
+  backgroundCtx.lineWidth = 1;
+  
+  // Кирпичи
+  for (let y = 0; y < castleWallThickness; y += 15) {
+    for (let x = (y % 30 === 0 ? 0 : 15); x < canvasSize; x += 30) {
+      backgroundCtx.strokeRect(x, y, 30, 15);
+    }
+  }
+  for (let y = canvasSize - castleWallThickness; y < canvasSize; y += 15) {
+    for (let x = (y % 30 === 0 ? 0 : 15); x < canvasSize; x += 30) {
+      backgroundCtx.strokeRect(x, y, 30, 15);
+    }
+  }
+  for (let y = castleWallThickness; y < canvasSize - castleWallThickness; y += 15) {
+    for (let x = (y % 30 === 0 ? 0 : 15); x < castleWallThickness; x += 30) {
+      backgroundCtx.strokeRect(x, y, 30, 15);
+    }
+  }
+  for (let y = castleWallThickness; y < canvasSize - castleWallThickness; y += 15) {
+    for (let x = canvasSize - castleWallThickness + (y % 30 === 0 ? 0 : 15); x < canvasSize; x += 30) {
+      backgroundCtx.strokeRect(x, y, 30, 15);
+    }
+  }
+
+  // Башни
+  const towerSize = 60;
+  drawTowerOnCtx(backgroundCtx, 0, 0, towerSize);
+  drawTowerOnCtx(backgroundCtx, canvasSize - towerSize, 0, towerSize);
+  drawTowerOnCtx(backgroundCtx, 0, canvasSize - towerSize, towerSize);
+  drawTowerOnCtx(backgroundCtx, canvasSize - towerSize, canvasSize - towerSize, towerSize);
+
+  // Зубцы
+  backgroundCtx.fillStyle = '#6d5e47';
+  const battlementWidth = 20;
+  const battlementHeight = 15;
+  const gap = 10;
+  
+  for (let x = 60; x < canvasSize - 60; x += battlementWidth + gap) {
+    backgroundCtx.fillRect(x, 0, battlementWidth, battlementHeight);
+    backgroundCtx.fillRect(x, canvasSize - battlementHeight, battlementWidth, battlementHeight);
+  }
+  for (let y = 60; y < canvasSize - 60; y += battlementWidth + gap) {
+    backgroundCtx.fillRect(0, y, battlementHeight, battlementWidth);
+    backgroundCtx.fillRect(canvasSize - battlementHeight, y, battlementHeight, battlementWidth);
+  }
+
+  // Игровое поле
+  const grassGradient = backgroundCtx.createLinearGradient(gameFieldStartX, gameFieldStartY, gameFieldStartX + gameFieldWidth, gameFieldStartY + gameFieldHeight);
+  grassGradient.addColorStop(0, '#1a3d1a');
+  grassGradient.addColorStop(0.5, '#2d5a2d');
+  grassGradient.addColorStop(1, '#1a3d1a');
+  backgroundCtx.fillStyle = grassGradient;
+  backgroundCtx.fillRect(gameFieldStartX, gameFieldStartY, gameFieldWidth, gameFieldHeight);
+  
+  // Сетка
+  backgroundCtx.strokeStyle = 'rgba(0, 50, 0, 0.3)';
+  backgroundCtx.lineWidth = 0.5;
+  for (let x = gameFieldStartX; x <= gameFieldStartX + gameFieldWidth; x += box) {
+    backgroundCtx.beginPath();
+    backgroundCtx.moveTo(x, gameFieldStartY);
+    backgroundCtx.lineTo(x, gameFieldStartY + gameFieldHeight);
+    backgroundCtx.stroke();
+  }
+  for (let y = gameFieldStartY; y <= gameFieldStartY + gameFieldHeight; y += box) {
+    backgroundCtx.beginPath();
+    backgroundCtx.moveTo(gameFieldStartX, y);
+    backgroundCtx.lineTo(gameFieldStartX + gameFieldWidth, y);
+    backgroundCtx.stroke();
+  }
+  
+  // Рамка
+  backgroundCtx.strokeStyle = '#4a3a2a';
+  backgroundCtx.lineWidth = 4;
+  backgroundCtx.strokeRect(gameFieldStartX, gameFieldStartY, gameFieldWidth, gameFieldHeight);
+}
+
+function drawTowerOnCtx(context, x, y, size) {
+  const towerGradient = context.createRadialGradient(x + size/2, y + size/2, 0, x + size/2, y + size/2, size);
+  towerGradient.addColorStop(0, '#a08060');
+  towerGradient.addColorStop(1, '#5d4e37');
+  context.fillStyle = towerGradient;
+  context.fillRect(x, y, size, size);
+  
+  context.strokeStyle = '#3d2e1f';
+  context.lineWidth = 3;
+  context.strokeRect(x, y, size, size);
+  
+  context.fillStyle = '#1a1a2e';
+  context.beginPath();
+  context.arc(x + size/2, y + size/2, 10, 0, Math.PI * 2);
+  context.fill();
+  context.strokeStyle = '#2a2a1e';
+  context.lineWidth = 2;
+  context.stroke();
+}
 
 function isDevMode() {
   // Проверяем, доступен ли WalletApp и его devMode
@@ -321,6 +438,7 @@ async function updateMenuUI() {
   document.getElementById('walletAddress').textContent = WalletApp.getShortAddress();
   
   document.getElementById('playerCoins').textContent = playerData.coins || 0;
+  document.getElementById('playerStars').textContent = playerData.stars || 0;  // ДОБАВЛЕНО
   document.getElementById('playerHighScore').textContent = playerData.high_score || 0;
   document.getElementById('gamesPlayed').textContent = playerData.games_played || 0;
   
@@ -330,8 +448,54 @@ async function updateMenuUI() {
   document.getElementById('shopCoins').textContent = playerData.coins || 0;
 }
 
-function getRarityColor(rarity) {
-  return RARITY_COLORS[rarity] || '#9ca3af';
+function spawnStar() {
+  if (star) return;
+  
+  const gridCols = Math.floor(gameFieldWidth / box);
+  const gridRows = Math.floor(gameFieldHeight / box);
+  
+  let x, y;
+  let attempts = 0;
+  
+  do {
+    x = Math.floor(Math.random() * gridCols) * box + gameFieldStartX;
+    y = Math.floor(Math.random() * gridRows) * box + gameFieldStartY;
+    attempts++;
+  } while (
+    attempts < 100 && 
+    (snake.some(seg => seg.x === x && seg.y === y) || 
+     (food && food.x === x && food.y === y))
+  );
+  
+  if (attempts < 100) {
+    star = { x, y, timer: 150 }; // 150 ходов (~25 сек при скорости 6)
+    console.log('Star position:', x, y);
+  }
+}
+
+function drawStar() {
+  if (!star) return;
+  
+  const x = star.x + box/2;
+  const y = star.y + box/2;
+  
+  // Мигание когда скоро исчезнет
+  if (star.timer < 60 && Math.floor(star.timer / 10) % 2 === 0) return;
+  
+  // Свечение
+  const glow = ctx.createRadialGradient(x, y, 0, x, y, box/2 + 8);
+  glow.addColorStop(0, 'rgba(255, 215, 0, 0.8)');
+  glow.addColorStop(1, 'rgba(255, 215, 0, 0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(x, y, box/2 + 8, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Звезда
+  ctx.font = `${box}px Arial`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('⭐', x, y);
 }
 
 // =====================
@@ -690,7 +854,7 @@ function updateSkinPreview(colors) {
 
 async function handleGameOver(finalScore, coinsEarned) {
   console.log('=== GAME OVER ===');
-  console.log('Score:', finalScore, 'Coins:', coinsEarned);
+  console.log('Score:', finalScore, 'Coins:', coinsEarned, 'Stars:', starsEarnedThisGame);
   
   try {
     WalletApp.hapticImpact('heavy');
@@ -700,24 +864,23 @@ async function handleGameOver(finalScore, coinsEarned) {
   const currentHighScore = playerData?.high_score || 0;
   const isNewRecord = finalScore > currentHighScore;
   
-  // Сначала показываем модальное окно (чтобы не зависало)
+  // Показываем модальное окно
   document.getElementById('finalScore').textContent = finalScore;
   document.getElementById('coinsEarned').textContent = coinsEarned;
+  document.getElementById('starsEarned').textContent = starsEarnedThisGame;  // ДОБАВЛЕНО
   document.getElementById('newRecordBadge').style.display = isNewRecord ? 'inline-block' : 'none';
   showModal('gameOverModal');
   
-  // Потом сохраняем в БД (асинхронно)
+  // Сохраняем в БД
   if (walletAddress && !WalletApp.devMode) {
     try {
       console.log('Saving to database...');
-      await SupabaseClient.endGameSession(finalScore, coinsEarned, walletAddress);
+      await SupabaseClient.endGameSession(finalScore, coinsEarned, starsEarnedThisGame, walletAddress);
       playerData = await SupabaseClient.getPlayer(walletAddress);
       console.log('Saved successfully');
     } catch (error) {
       console.error('Save error:', error);
     }
-  } else {
-    console.log('Skipping save - devMode:', WalletApp.devMode);
   }
   
   await updateMenuUI();
@@ -763,6 +926,14 @@ async function startNewGame() {
 }
 
 function initGame() {
+  backgroundCanvas = null; // Сбрасываем кэш фона
+  
+  snake = [{ 
+    x: Math.floor(gameFieldWidth / box / 2) * box + gameFieldStartX, 
+    y: Math.floor(gameFieldHeight / box / 2) * box + gameFieldStartY, 
+    dir: "RIGHT" 
+  }];
+  
   snake = [{ 
     x: Math.floor(gameFieldWidth / box / 2) * box + gameFieldStartX, 
     y: Math.floor(gameFieldHeight / box / 2) * box + gameFieldStartY, 
@@ -776,6 +947,10 @@ function initGame() {
   coinsEarnedThisGame = 0;
   highScore = playerData?.high_score || 0;
   
+  star = null;
+  starsEarnedThisGame = 0;
+  starSpawnTimer = 0;
+
   coinMultiplier = 1;
   lives = 1;
   magnetRadius = 0;
@@ -889,48 +1064,21 @@ function applyMagnetEffect() {
 }
 
 // Drawing functions
-function drawCastle() {
-  const gradient = ctx.createLinearGradient(0, 0, canvasSize, canvasSize);
-  gradient.addColorStop(0, '#5d4e37');
-  gradient.addColorStop(0.5, '#8b7355');
-  gradient.addColorStop(1, '#5d4e37');
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, canvasSize, canvasSize);
 
-  ctx.strokeStyle = '#3d3426';
-  ctx.lineWidth = 1;
+function drawBackground() {
+  if (!backgroundCanvas) {
+    createBackground();
+  }
+  ctx.drawImage(backgroundCanvas, 0, 0);
   
-  for (let y = 0; y < castleWallThickness; y += 15) {
-    for (let x = (y % 30 === 0 ? 0 : 15); x < canvasSize; x += 30) {
-      ctx.strokeRect(x, y, 30, 15);
-    }
+  // Рисуем магнит отдельно (он динамический)
+  if (magnetRadius > 0 && snake.length > 0) {
+    ctx.strokeStyle = 'rgba(147, 51, 234, 0.3)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(snake[0].x + box/2, snake[0].y + box/2, magnetRadius, 0, Math.PI * 2);
+    ctx.stroke();
   }
-
-  for (let y = canvasSize - castleWallThickness; y < canvasSize; y += 15) {
-    for (let x = (y % 30 === 0 ? 0 : 15); x < canvasSize; x += 30) {
-      ctx.strokeRect(x, y, 30, 15);
-    }
-  }
-
-  for (let y = castleWallThickness; y < canvasSize - castleWallThickness; y += 15) {
-    for (let x = (y % 30 === 0 ? 0 : 15); x < castleWallThickness; x += 30) {
-      ctx.strokeRect(x, y, 30, 15);
-    }
-  }
-
-  for (let y = castleWallThickness; y < canvasSize - castleWallThickness; y += 15) {
-    for (let x = canvasSize - castleWallThickness + (y % 30 === 0 ? 0 : 15); x < canvasSize; x += 30) {
-      ctx.strokeRect(x, y, 30, 15);
-    }
-  }
-
-  const towerSize = 60;
-  drawTower(0, 0, towerSize);
-  drawTower(canvasSize - towerSize, 0, towerSize);
-  drawTower(0, canvasSize - towerSize, towerSize);
-  drawTower(canvasSize - towerSize, canvasSize - towerSize, towerSize);
-
-  drawBattlements();
 }
 
 function drawTower(x, y, size) {
@@ -976,41 +1124,7 @@ function drawBattlements() {
   }
 }
 
-function drawGameField() {
-  const grassGradient = ctx.createLinearGradient(gameFieldStartX, gameFieldStartY, gameFieldStartX + gameFieldWidth, gameFieldStartY + gameFieldHeight);
-  grassGradient.addColorStop(0, '#1a3d1a');
-  grassGradient.addColorStop(0.5, '#2d5a2d');
-  grassGradient.addColorStop(1, '#1a3d1a');
-  ctx.fillStyle = grassGradient;
-  ctx.fillRect(gameFieldStartX, gameFieldStartY, gameFieldWidth, gameFieldHeight);
-  
-  ctx.strokeStyle = 'rgba(0, 50, 0, 0.3)';
-  ctx.lineWidth = 0.5;
-  for (let x = gameFieldStartX; x <= gameFieldStartX + gameFieldWidth; x += box) {
-    ctx.beginPath();
-    ctx.moveTo(x, gameFieldStartY);
-    ctx.lineTo(x, gameFieldStartY + gameFieldHeight);
-    ctx.stroke();
-  }
-  for (let y = gameFieldStartY; y <= gameFieldStartY + gameFieldHeight; y += box) {
-    ctx.beginPath();
-    ctx.moveTo(gameFieldStartX, y);
-    ctx.lineTo(gameFieldStartX + gameFieldWidth, y);
-    ctx.stroke();
-  }
-  
-  ctx.strokeStyle = '#4a3a2a';
-  ctx.lineWidth = 4;
-  ctx.strokeRect(gameFieldStartX, gameFieldStartY, gameFieldWidth, gameFieldHeight);
-  
-  if (magnetRadius > 0) {
-    ctx.strokeStyle = 'rgba(147, 51, 234, 0.3)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(snake[0].x + box/2, snake[0].y + box/2, magnetRadius, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-}
+
 
 function drawSnake() {
   snake.forEach((segment, index) => {
@@ -1190,6 +1304,34 @@ function updateSnake() {
   if (direction === "LEFT") head.x -= box;
   if (direction === "RIGHT") head.x += box;
 
+  // Обновляем таймер звезды
+  if (star) {
+    star.timer--;
+    if (star.timer <= 0) {
+      star = null;
+    }
+  }
+  
+  // Спавн звезды - каждые 50-80 ходов с 20% шансом
+  starSpawnTimer++;
+  if (!star && starSpawnTimer >= 50) {
+    if (Math.random() < 0.2) {
+      spawnStar();
+      console.log('⭐ Star spawned!');
+    }
+    starSpawnTimer = 0;
+  }
+  
+  // Проверка сбора звезды ДО проверки стен
+  if (star && head.x === star.x && head.y === star.y) {
+    WalletApp.hapticImpact('heavy');
+    starsEarnedThisGame++;
+    star = null;
+    starSpawnTimer = 0;
+    showToast('⭐ +1 Star!', 'success');
+    console.log('⭐ Star collected! Total:', starsEarnedThisGame);
+  }
+
   const hitWall = (
     head.x < gameFieldStartX || 
     head.x >= gameFieldStartX + gameFieldWidth ||
@@ -1198,7 +1340,7 @@ function updateSnake() {
   );
   
   const hitSelf = collision(head, snake);
-  
+
   if (hitWall) {
     if (hasShield && hasPerk('shield') && !activePerks['shield'].used) {
       usePerk('shield');
@@ -1295,24 +1437,26 @@ function gameLoop(timestamp) {
   
   if (!lastTime) lastTime = timestamp;
   const delta = timestamp - lastTime;
-
-  if (delta > 1000 / speed) {
-    ctx.clearRect(0, 0, canvasSize, canvasSize);
-    drawCastle();
-    drawGameField();
+  const frameTime = 1000 / speed;
+  
+  if (delta >= frameTime) {
+    lastTime = timestamp - (delta % frameTime);
+    
     updateSnake();
     
     if (!gameOver) {
+      ctx.clearRect(0, 0, canvasSize, canvasSize);
+      drawBackground();
       drawFood();
+      drawStar();
       drawSnake();
       drawLives();
     }
-    
-    lastTime = timestamp;
   }
   
   animationId = requestAnimationFrame(gameLoop);
 }
+
 // =====================
 // BUTTON HANDLERS
 // =====================

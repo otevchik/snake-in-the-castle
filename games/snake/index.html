@@ -52,6 +52,11 @@
             <span class="stat-label">Coins</span>
           </div>
           <div class="stat-card">
+            <span class="stat-icon">⭐</span>
+            <span class="stat-value" id="playerStars">0</span>
+            <span class="stat-label">Stars</span>
+          </div>
+          <div class="stat-card">
             <span class="stat-icon">🏆</span>
             <span class="stat-value" id="playerHighScore">0</span>
             <span class="stat-label">Best</span>
@@ -252,6 +257,7 @@
       </div>
     </div>
     
+
     <!-- Game Over Modal -->
   <div id="gameOverModal" class="modal">
     <div class="modal-content">
@@ -259,6 +265,7 @@
       <div class="score-display">
         <span class="final-score">Score: <span id="finalScore">0</span></span>
         <span class="coins-earned">+<span id="coinsEarned">0</span> 💰</span>
+        <span class="stars-earned">+<span id="starsEarned">0</span> ⭐</span>
       </div>
       <div id="newRecordBadge" class="new-record hidden">🎉 New Record!</div>
       <button id="gameOverCloseBtn" class="modal-btn">Continue</button>

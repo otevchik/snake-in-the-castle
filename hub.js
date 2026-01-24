@@ -1,20 +1,17 @@
 // hub.js - Fast loading hub
 
-const SUPABASE_URL = 'https://hiicndghblbsrgbmtufd.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpaWNuZGdoYmxic3JnYm10dWZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4OTQ5NzIsImV4cCI6MjA4NDQ3MDk3Mn0.cX6CU4bl3jHbFRw75I0LyMpPMEK2GzYoDcmeQa05kMI';
-
 const Hub = {
   devMode: false,
 
   init() {
     console.log('🎮 Hub init');
-
+    
     this.devMode = this.checkDevMode();
     this.hideLoading();
     this.showConnect();
     this.setupEvents();
     this.tryAutoReconnect();
-
+    
     if (this.devMode) this.showDevBadge();
   },
 
@@ -22,7 +19,6 @@ const Hub = {
     const urlParams = new URLSearchParams(window.location.search);
     const hostname = window.location.hostname;
     
-    // ИСПРАВЛЕНО: без пустой строки
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
     const hasDevParam = urlParams.get('dev') === 'true';
     const isDevProvider = localStorage.getItem('wallet_provider') === 'dev';
@@ -41,7 +37,7 @@ const Hub = {
         BaseWallet.init(),
         new Promise(resolve => setTimeout(() => resolve(false), 2000))
       ]);
-
+      
       if (connected) {
         this.showHub();
       }
@@ -56,15 +52,15 @@ const Hub = {
     document.getElementById('connectOther')?.addEventListener('click', () => this.connect());
     document.getElementById('connectDev')?.addEventListener('click', () => this.connectDev());
     document.getElementById('disconnectBtn')?.addEventListener('click', () => this.disconnect());
-
+    
     document.querySelectorAll('.game-card:not(.coming-soon)').forEach(card => {
       card.addEventListener('click', () => this.openGame(card.dataset.game));
     });
-
+    
     window.addEventListener('walletDisconnected', () => this.showConnect());
     window.addEventListener('walletChanged', () => this.updateUI());
     window.addEventListener('chainChanged', () => this.updateUI());
-
+    
     document.addEventListener('keydown', (e) => {
       if (e.ctrlKey && e.shiftKey && e.key === 'D') {
         e.preventDefault();
@@ -78,10 +74,10 @@ const Hub = {
       this.toast('❌ No wallet found. Use Dev Wallet.');
       return;
     }
-
+    
     const btns = ['connectBase', 'connectCoinbase', 'connectOther'];
     btns.forEach(id => this.setLoading(id, true));
-
+    
     try {
       await BaseWallet.connectWallet();
       this.showHub();
@@ -97,16 +93,16 @@ const Hub = {
 
   connectDev() {
     this.setLoading('connectDev', true);
-
+    
     setTimeout(() => {
       BaseWallet.address = '0xDEV' + '0'.repeat(36) + 'TEST';
       BaseWallet.chainId = 8453;
       BaseWallet.profile = { name: '🔧 Dev Tester', avatar: null };
-
+      
       localStorage.setItem('wallet_address', BaseWallet.address);
       localStorage.setItem('wallet_provider', 'dev');
       localStorage.setItem('devMode', 'true');
-
+      
       this.devMode = true;
       this.setLoading('connectDev', false);
       this.showHub();
@@ -117,11 +113,11 @@ const Hub = {
   setLoading(btnId, loading) {
     const btn = document.getElementById(btnId);
     if (!btn) return;
-
+    
     btn.disabled = loading;
     const title = btn.querySelector('.wallet-btn-title');
     if (!title) return;
-
+    
     if (loading) {
       btn.dataset.text = title.textContent;
       title.textContent = 'Connecting...';
@@ -139,7 +135,7 @@ const Hub = {
   showConnect() {
     document.getElementById('connectScreen')?.classList.remove('hidden');
     document.getElementById('hubScreen')?.classList.add('hidden');
-
+    
     const devBtn = document.getElementById('connectDev');
     if (devBtn) devBtn.style.display = this.devMode ? 'flex' : 'none';
   },
@@ -154,107 +150,130 @@ const Hub = {
   updateUI() {
     const addr = BaseWallet.address;
     const profile = BaseWallet.profile;
-
+    
     const nameEl = document.getElementById('profileName');
     const addrEl = document.getElementById('profileAddress');
     const avatarEl = document.getElementById('avatarFallback');
-
+    
     if (nameEl) nameEl.textContent = profile?.name || 'Player';
     if (addrEl) addrEl.textContent = BaseWallet.shortenAddress(addr);
     if (avatarEl) avatarEl.textContent = this.devMode ? '🔧' : '👤';
-
+    
     const netEl = document.getElementById('networkName');
     const dotEl = document.querySelector('.network-dot');
-
+    
     if (netEl) netEl.textContent = BaseWallet.getNetworkName();
-
+    
     const isBase = BaseWallet.isOnBase();
     const color = this.devMode ? '#f59e0b' : (isBase ? '#10b981' : '#f59e0b');
-
+    
     if (dotEl) dotEl.style.background = color;
     if (netEl) netEl.style.color = color;
   },
 
   // ИСПРАВЛЕНО: Загружаем из Supabase
-   async loadStats() {
-  const addr = BaseWallet.address;
-  if (!addr) {
-    console.log('No address, skipping stats');
-    return;
-  }
+  async loadStats() {
+    const addr = BaseWallet.address;
+    if (!addr) {
+      console.log('No address, skipping stats');
+      return;
+    }
+    
+    console.log('Loading stats for:', addr);
+    console.log('DevMode:', this.devMode);
 
-  console.log('Loading stats for:', addr);
-  console.log('DevMode:', this.devMode);
+    // Если DEV режим - показываем тестовые данные
+    if (this.devMode) {
+      console.log('DEV mode - using mock stats');
+      this.renderStats({
+        totalCoins: 1000,
+        totalGames: 5,
+        totalStars: 15,
+        snakeHighScore: 300,
+        spaceHighScore: 200
+      });
+      return;
+    }
 
-  // Если DEV режим - показываем тестовые данные
-  if (this.devMode) {
-    console.log('DEV mode - using mock stats');
-    this.renderStats({
-      totalCoins: 1000,
-      totalGames: 5,
-      totalScore: 500,
-      snakeHighScore: 300,
-      spaceHighScore: 200
-    });
-    return;
-  }
+    // Загружаем из Supabase
+    try {
+      console.log('Fetching from Supabase...');
+      
+      const [snakeData, spaceData] = await Promise.all([
+        this.fetchSupabase('web3_players', addr),
+        this.fetchSupabase('space_web3_players', addr)
+      ]);
+      
+      console.log('Snake data:', snakeData);
+      console.log('Space data:', spaceData);
+      
+      // ИСПРАВЛЕНО: Сначала парсим данные
+      const snake = Array.isArray(snakeData) && snakeData[0] ? snakeData[0] : {};
+      const space = Array.isArray(spaceData) && spaceData[0] ? spaceData[0] : {};
+      
+      console.log('Snake parsed:', snake);
+      console.log('Space parsed:', space);
+      
+      // ИСПРАВЛЕНО: Теперь создаём stats после парсинга
+      const stats = {
+        totalCoins: (snake.coins || 0) + (space.coins || 0),
+        totalGames: (snake.games_played || 0) + (space.games_played || 0),
+        totalStars: (snake.stars || 0) + (space.stars || 0),
+        snakeHighScore: snake.high_score || 0,
+        spaceHighScore: space.high_score || 0
+      };
+      
+      console.log('Final stats:', stats);
+      
+      this.renderStats(stats);
+      
+      // Кэшируем
+      const key = `stats_${addr}`;
+      localStorage.setItem(key, JSON.stringify(stats));
+      
+      console.log('Stats rendered!');
+    } catch (e) {
+      console.error('Error loading stats:', e);
+      // Показываем нули при ошибке
+      this.renderStats({
+        totalCoins: 0,
+        totalGames: 0,
+        totalStars: 0,
+        snakeHighScore: 0,
+        spaceHighScore: 0
+      });
+    }
+  },
 
-  // Загружаем из Supabase
-  try {
-    console.log('Fetching from Supabase...');
-    
-    const [snakeData, spaceData] = await Promise.all([
-      this.fetchSupabase('web3_players', addr),
-      this.fetchSupabase('space_web3_players', addr)
-    ]);
-    
-    console.log('Snake data:', snakeData);
-    console.log('Space data:', spaceData);
-    
-    const snake = Array.isArray(snakeData) && snakeData[0] ? snakeData[0] : {};
-    const space = Array.isArray(spaceData) && spaceData[0] ? spaceData[0] : {};
-    
-    console.log('Snake parsed:', snake);
-    console.log('Space parsed:', space);
-    
-    const stats = {
-      totalCoins: (snake.coins || 0) + (space.coins || 0),
-      totalGames: (snake.games_played || 0) + (space.games_played || 0),
-      totalScore: Math.max(snake.high_score || 0, space.high_score || 0),
-      snakeHighScore: snake.high_score || 0,
-      spaceHighScore: space.high_score || 0
-    };
-    
-    console.log('Final stats:', stats);
-    
-    this.renderStats(stats);
-    
-    // Кэшируем
-    const key = `stats_${addr}`;
-    localStorage.setItem(key, JSON.stringify(stats));
-    
-    console.log('Stats rendered!');
-    
-  } catch (e) {
-    console.error('Error loading stats:', e);
-  }
-},
-  
   // Вспомогательная функция для рендера
   renderStats(stats) {
-    document.getElementById('totalCoins').textContent = stats.totalCoins || 0;
-    document.getElementById('totalGames').textContent = stats.totalGames || 0;
-    document.getElementById('totalScore').textContent = stats.totalScore || 0;
-    document.getElementById('snakeHighScore').textContent = stats.snakeHighScore || 0;
-    document.getElementById('spaceHighScore').textContent = stats.spaceHighScore || 0;
+    const coinsEl = document.getElementById('totalCoins');
+    const gamesEl = document.getElementById('totalGames');
+    const starsEl = document.getElementById('totalScore'); // В HTML это totalScore, но показываем звёзды
+    const snakeEl = document.getElementById('snakeHighScore');
+    const spaceEl = document.getElementById('spaceHighScore');
+    
+    if (coinsEl) coinsEl.textContent = stats.totalCoins || 0;
+    if (gamesEl) gamesEl.textContent = stats.totalGames || 0;
+    if (starsEl) starsEl.textContent = stats.totalStars || 0;
+    if (snakeEl) snakeEl.textContent = stats.snakeHighScore || 0;
+    if (spaceEl) spaceEl.textContent = stats.spaceHighScore || 0;
+    
+    console.log('Rendered:', {
+      coins: stats.totalCoins,
+      games: stats.totalGames,
+      stars: stats.totalStars
+    });
   },
-  
-  // Простой fetch для Supabase (без полной библиотеки)
+
+  // Простой fetch для Supabase
   async fetchSupabase(table, address) {
     const SUPABASE_URL = 'https://hiicndghblbsrgbmtufd.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpaWNuZGdoYmxic3JnYm10dWZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4OTQ5NzIsImV4cCI6MjA4NDQ3MDk3Mn0.cX6CU4bl3jHbFRw75I0LyMpPMEK2GzYoDcmeQa05kMI';
     
     const url = `${SUPABASE_URL}/rest/v1/${table}?wallet_address=eq.${address.toLowerCase()}&select=*`;
+    
+    console.log('Fetching:', url);
     
     const response = await fetch(url, {
       headers: {
@@ -263,35 +282,12 @@ const Hub = {
       }
     });
     
-    return response.json();
-  },
-
-  // Запрос к Supabase
-  async fetchPlayerStats(table, walletAddress) {
-    const address = walletAddress.toLowerCase();
-    
-    try {
-      const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/${table}?wallet_address=eq.${address}&select=coins,high_score,games_played`,
-        {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-          }
-        }
-      );
-
-      if (!response.ok) {
-        console.warn(`Table ${table} error:`, response.status);
-        return null;
-      }
-
-      const data = await response.json();
-      return data && data.length > 0 ? data[0] : null;
-    } catch (error) {
-      console.warn(`Failed to fetch ${table}:`, error);
-      return null;
+    if (!response.ok) {
+      console.error('Supabase error:', response.status, response.statusText);
+      return [];
     }
+    
+    return response.json();
   },
 
   openGame(game) {
@@ -299,16 +295,16 @@ const Hub = {
       'snake': 'games/snake/',
       'space-ship': 'games/space-ship/'
     };
-
+    
     if (!urls[game]) return;
-
+    
     const basePath = window.location.pathname.replace(/\/[^\/]*$/, '');
     const url = new URL(`${basePath}/${urls[game]}`, window.location.origin);
-
+    
     if (this.devMode) {
       url.searchParams.set('dev', 'true');
     }
-
+    
     window.location.href = url.toString();
   },
 

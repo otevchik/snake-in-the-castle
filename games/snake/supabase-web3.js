@@ -75,6 +75,7 @@ const SupabaseClient = {
           coins: 250,
           high_score: 0,
           games_played: 0,
+          stars: 0,
           equipped_skin: 'knight'
         }
       });
@@ -100,15 +101,22 @@ const SupabaseClient = {
     try {
       const address = walletAddress.toLowerCase();
       
+      const updateData = {
+        coins: data.coins,
+        high_score: data.high_score,
+        games_played: data.games_played,
+        equipped_skin: data.equipped_skin,
+        updated_at: new Date().toISOString()
+      };
+      
+      // Добавляем stars только если передано
+      if (data.stars !== undefined) {
+        updateData.stars = data.stars;
+      }
+      
       await this.request(`web3_players?wallet_address=eq.${address}`, {
         method: 'PATCH',
-        body: {
-          coins: data.coins,
-          high_score: data.high_score,
-          games_played: data.games_played,
-          equipped_skin: data.equipped_skin,
-          updated_at: new Date().toISOString()
-        }
+        body: updateData
       });
       return true;
     } catch (error) {
@@ -121,14 +129,7 @@ const SupabaseClient = {
   // GAME SESSION
   // =====================
   
-  async endGameSession(finalScore, coinsEarned, walletAddress) {
-    // Если вы хотите полный контроль, добавьте проверку тут:
-    if (WalletApp.devMode === true) {
-        console.log('🔧 DEV MODE: SupabaseClient.endGameSession skipped.');
-        // Если мы здесь, значит в game.js мы уже обновили playerData, но нужно вернуть структуру, которую ждёт game.js
-        return { success: true, coinsEarned, isNewRecord: finalScore > (playerData?.high_score || 0) };
-    }
-
+  async endGameSession(finalScore, coinsEarned, starsEarned, walletAddress) {
     try {
       const address = walletAddress.toLowerCase();
       const player = await this.getPlayer(address);
@@ -139,6 +140,7 @@ const SupabaseClient = {
         coins: (player?.coins || 0) + coinsEarned,
         high_score: Math.max(player?.high_score || 0, finalScore),
         games_played: (player?.games_played || 0) + 1,
+        stars: (player?.stars || 0) + starsEarned,
         equipped_skin: player?.equipped_skin || 'knight'
       });
       
@@ -146,7 +148,7 @@ const SupabaseClient = {
         await this.updateLeaderboard(address, finalScore);
       }
       
-      return { success: true, coinsEarned, isNewRecord };
+      return { success: true, coinsEarned, starsEarned, isNewRecord };
     } catch (error) {
       console.error('Error ending session:', error);
       return { success: false };
@@ -243,6 +245,7 @@ const SupabaseClient = {
         coins: player.coins - price,
         high_score: player.high_score,
         games_played: player.games_played,
+        stars: player.stars,
         equipped_skin: player.equipped_skin
       });
       
@@ -345,6 +348,7 @@ const SupabaseClient = {
         coins: newCoins,
         high_score: player.high_score,
         games_played: player.games_played,
+        stars: player.stars,
         equipped_skin: player.equipped_skin
       });
       
@@ -377,6 +381,7 @@ const SupabaseClient = {
         coins: player.coins,
         high_score: player.high_score,
         games_played: player.games_played,
+        stars: player.stars,
         equipped_skin: skinId
       });
       

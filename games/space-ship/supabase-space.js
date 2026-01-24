@@ -98,26 +98,27 @@ const SupabaseSpace = {
   },
   
   async updatePlayer(walletAddress, data) {
-    const address = walletAddress.toLowerCase();
-    
-    try {
-      await this.request(`space_web3_players?wallet_address=eq.${address}`, {
-        method: 'PATCH',
-        body: {
-          coins: data.coins,
-          high_score: data.high_score,
-          games_played: data.games_played,
-          total_asteroids: data.total_asteroids,
-          equipped_ship: data.equipped_ship,
-          updated_at: new Date().toISOString()
-        }
-      });
-      return true;
-    } catch (error) {
-      console.error('Error updating player:', error);
-      return false;
-    }
-  },
+  const address = walletAddress.toLowerCase();
+  
+  try {
+    await this.request(`space_web3_players?wallet_address=eq.${address}`, {
+      method: 'PATCH',
+      body: {
+        coins: data.coins,
+        high_score: data.high_score,
+        games_played: data.games_played,
+        total_asteroids: data.total_asteroids,
+        stars: data.stars,  // ДОБАВЛЕНО
+        equipped_ship: data.equipped_ship,
+        updated_at: new Date().toISOString()
+      }
+    });
+    return true;
+  } catch (error) {
+    console.error('Error updating player:', error);
+    return false;
+  }
+},
 
   // =====================
   // GAME SESSION
@@ -141,43 +142,44 @@ const SupabaseSpace = {
     }
   },
   
-  async endGameSession(sessionToken, finalScore, asteroidsDestroyed, coinsCollected, walletAddress) {
-    const address = walletAddress.toLowerCase();
-    
-    try {
-      if (sessionToken) {
-        await this.request(`space_web3_sessions?session_token=eq.${sessionToken}`, {
-          method: 'PATCH',
-          body: {
-            ended_at: new Date().toISOString(),
-            final_score: finalScore,
-            asteroids_destroyed: asteroidsDestroyed,
-            coins_collected: coinsCollected
-          }
-        });
-      }
-      
-      const player = await this.getPlayer(address);
-      const totalCoins = coinsCollected + Math.floor(finalScore / 10);
-      const isNewRecord = finalScore > (player?.high_score || 0);
-      
-      await this.updatePlayer(address, {
-        coins: (player?.coins || 0) + totalCoins,
-        high_score: Math.max(player?.high_score || 0, finalScore),
-        games_played: (player?.games_played || 0) + 1,
-        total_asteroids: (player?.total_asteroids || 0) + asteroidsDestroyed,
-        equipped_ship: player?.equipped_ship || 'fighter'
+  async endGameSession(sessionToken, finalScore, asteroidsDestroyed, coinsCollected, starsCollected, walletAddress) {
+  const address = walletAddress.toLowerCase();
+  
+  try {
+    if (sessionToken) {
+      await this.request(`space_web3_sessions?session_token=eq.${sessionToken}`, {
+        method: 'PATCH',
+        body: {
+          ended_at: new Date().toISOString(),
+          final_score: finalScore,
+          asteroids_destroyed: asteroidsDestroyed,
+          coins_collected: coinsCollected
+        }
       });
-      
-      if (isNewRecord && finalScore > 0) {
-        await this.updateLeaderboard(address, finalScore, asteroidsDestroyed);
-      }
-      
-      return { success: true, coinsEarned: totalCoins, isNewRecord };
-    } catch (error) {
-      return { success: false, error: error.message };
     }
-  },
+    
+    const player = await this.getPlayer(address);
+    const totalCoins = coinsCollected + Math.floor(finalScore / 10);
+    const isNewRecord = finalScore > (player?.high_score || 0);
+    
+    await this.updatePlayer(address, {
+      coins: (player?.coins || 0) + totalCoins,
+      high_score: Math.max(player?.high_score || 0, finalScore),
+      games_played: (player?.games_played || 0) + 1,
+      total_asteroids: (player?.total_asteroids || 0) + asteroidsDestroyed,
+      stars: (player?.stars || 0) + starsCollected,  // ДОБАВЛЕНО
+      equipped_ship: player?.equipped_ship || 'fighter'
+    });
+    
+    if (isNewRecord && finalScore > 0) {
+      await this.updateLeaderboard(address, finalScore, asteroidsDestroyed);
+    }
+    
+    return { success: true, coinsEarned: totalCoins, starsEarned: starsCollected, isNewRecord };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+},
 
   // =====================
   // LEADERBOARD
